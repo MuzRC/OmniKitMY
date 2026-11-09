@@ -35,9 +35,12 @@ jobs:
           npx cap add android
           npx cap sync android
 
-      # 2.1 Salin & ganti ikon aplikasi 3D baharu dari folder android-res
+      # 2.1 Buang adaptive icon Capacitor & salin ikon 3D baharu dari folder android-res
       - name: Copy Custom App Icons
         run: |
+          echo "Membuang adaptive icon XML bawaan Capacitor..."
+          rm -rf android/app/src/main/res/mipmap-anydpi-v26
+
           echo "Menyalin ikon kustom ke dalam folder res Android..."
           cp -rf android-res/* android/app/src/main/res/
 
