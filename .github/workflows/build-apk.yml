@@ -1,0 +1,75 @@
+name: Build & Sign Android APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # 1. Compile fail Web (React / Vite)
+      - name: Install Dependencies & Build Web Assets
+        run: |
+          npm install
+          npm run build
+
+      # 2. Pasang Capacitor & jana perumah Android secara automatik
+      - name: Initialize Capacitor Android Container
+        run: |
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init "OmniKit" "com.muz.omnikit" --web-dir dist
+          npx cap add android
+          npx cap sync android
+
+      # 3. Build Unsigned Release APK guna Gradle
+      - name: Compile Release APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      # 4. Sign APK guna Secrets yang sedia ada
+      - name: Sign Release APK
+        run: |
+          # Decode Keystore dari Base64
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.jks
+
+          # Cari laluan apksigner terkini dalam runner
+          BUILD_TOOLS_PATH=$(ls -d $ANDROID_HOME/build-tools/* | tail -n 1)
+
+          # Tandatangani APK
+          $BUILD_TOOLS_PATH/apksigner sign \
+            --ks release.jks \
+            --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
+            --ks-pass "pass:${{ secrets.STORE_PASSWORD }}" \
+            --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
+            --out app-release-signed.apk \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk
+
+          # Padam jks demi keselamatan
+          rm -f release.jks
+
+      # 5. Simpan & sediakan APK untuk dimuat turun
+      - name: Upload Signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniKit-Signed-Release-APK
+          path: app-release-signed.apk
