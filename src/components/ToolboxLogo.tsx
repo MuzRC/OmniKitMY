@@ -1,10 +1,11 @@
 /**
  * @file src/components/ToolboxLogo.tsx
- * @description Komponen Ikon Rasmi OmniKitMY - Kotak Alatan (Toolbox)
- * Menggabungkan warna Merah, Biru, Kuning, dan Putih mengikut kehendak pengguna.
+ * @description Komponen Logo Rasmi OmniKitMY (Ikon 3D Neon Toolkit).
+ * Memaparkan fail imej `/icon.png` dengan sandaran automatik ke vektor SVG
+ * sekiranya fail imej belum diletakkan di dalam folder `public/` atau gagal dimuatkan.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 
 interface ToolboxLogoProps {
   className?: string;
@@ -12,6 +13,24 @@ interface ToolboxLogoProps {
 }
 
 export const ToolboxLogo: React.FC<ToolboxLogoProps> = ({ className = '', size = 36 }) => {
+  const [imgError, setImgError] = useState(false);
+
+  // 1. Papar imej ikon 3D jika tiada ralat muat fail
+  if (!imgError) {
+    return (
+      <img
+        src="/icon.png"
+        alt="OmniKitMY Logo"
+        width={size}
+        height={size}
+        onError={() => setImgError(true)}
+        style={{ width: `${size}px`, height: `${size}px` }}
+        className={`shrink-0 rounded-xl object-contain drop-shadow-[0_0_10px_rgba(56,189,248,0.4)] border border-cyan-500/30 bg-slate-900/80 transition-transform active:scale-95 ${className}`}
+      />
+    );
+  }
+
+  // 2. Sandaran (Fallback) vektor SVG asal sekiranya /icon.png tiada
   return (
     <svg
       width={size}
@@ -69,9 +88,8 @@ export const ToolboxLogo: React.FC<ToolboxLogoProps> = ({ className = '', size =
       />
       <circle cx="50" cy="49" r="2.5" fill="#dc2626" />
 
-      {/* Lencana Alatan Bersilang di Dalam Kotak (Putih) */}
+      {/* Lencana Alatan Bersilang di Dalam Kotak (Putih & Kuning) */}
       <g opacity="0.95">
-        {/* Sepana Putih */}
         <path
           d="M32 68 L42 78"
           stroke="#ffffff"
@@ -79,8 +97,6 @@ export const ToolboxLogo: React.FC<ToolboxLogoProps> = ({ className = '', size =
           strokeLinecap="round"
         />
         <circle cx="31" cy="67" r="4" stroke="#ffffff" strokeWidth="2.5" fill="none" />
-        
-        {/* Pemutar Skru Putih bersilang */}
         <path
           d="M68 68 L58 78"
           stroke="#ffffff"
