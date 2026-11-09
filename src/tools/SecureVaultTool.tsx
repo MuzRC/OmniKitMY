@@ -3,16 +3,20 @@
  * @description Alatan Peti Kebal Rahsia (Secure Encrypted Vault).
  * 
  * FUNGSI UTAMA:
- * 1. Penyulitan gred tentera AES-GCM 256-bit dijana daripada PIN/Kata Laluan menggunakan PBKDF2.
- * 2. Menyimpan nota sulit, kata laluan, dan fail foto secara selamat di dalam storan IndexedDB luar talian.
- * 3. Kunci automatik (Auto-lock) serta-merta apabila pengguna meninggalkan alatan.
- * 4. Tiada data dihantar ke mana-mana pelayan luar — 100% peribadi pada perkakasan telefon pengguna.
+ * 1. Penyulitan perkakasan AES-GCM 256-bit menggunakan PIN (PBKDF2).
+ * 2. Token Pengesah Kunci (Auth Verifier) — menghalang akses jika PIN tidak sepadan.
+ * 3. Amaran dwi-PIN semasa pendaftaran kali pertama (mencegah salah taip).
+ * 4. Fungsi 'Set Semula / Self-Destruct' — memadam bersih semua data jika terlupa PIN.
+ * 5. Kunci automatik serta-merta apabila keluar daripada alatan.
  */
 
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Lock, Unlock, Plus, Trash2, KeyRound, FileText, Image as ImageIcon, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { 
+  ArrowLeft, Lock, Unlock, Plus, Trash2, KeyRound, 
+  FileText, Eye, EyeOff, Key, AlertTriangle, AlertOctagon 
+} from 'lucide-react';
 import { encryptData, decryptData } from '../services/cryptoUtils';
-import { saveVaultItem, getVaultItems, deleteVaultItem } from '../services/storage';
+import { saveVaultItem, getVaultItems, deleteVaultItem, getStoredSetting, saveStoredSetting } from '../services/storage';
 import { Language, VaultItem } from '../types/tool';
 
 interface Props {
@@ -20,12 +24,28 @@ interface Props {
   onBack: () => void;
 }
 
+interface VaultAuthVerifier {
+  ciphertext: string;
+  iv: string;
+  salt: string;
+}
+
+const VERIFIER_KEY = 'omnikit_vault_auth_token';
+const AUTH_SECRET_TEXT = 'VAULT_ACCESS_GRANTED_SECURE_256';
+
 export const SecureVaultTool: React.FC<Props> = ({ lang, onBack }) => {
   const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [items, setItems] = useState<VaultItem[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+
+  // Semak sama ada pengguna sudah pernah cipta PIN sebelum ini
+  const [hasMasterPin, setHasMasterPin] = useState<boolean>(() => {
+    return !!getStoredSetting<VaultAuthVerifier | null>(VERIFIER_KEY, null);
+  });
 
   // Borang item baharu
   const [newTitle, setNewTitle] = useState('');
@@ -34,27 +54,122 @@ export const SecureVaultTool: React.FC<Props> = ({ lang, onBack }) => {
 
   // Paparan item didekripsi
   const [decryptedContents, setDecryptedContents] = useState<Record<string, string>>({});
-  const [loadingItems, setLoadingItems] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Buka Peti Kebal dengan PIN
+  // 1. Cipta PIN Master Kali Pertama (Wajib 2 Kali)
+  const handleCreateMasterPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pin.length < 4) {
+      setErrorMsg(lang === 'ms' ? 'PIN mestilah sekurang-kurangnya 4 digit.' : 'PIN must be at least 4 digits.');
+      return;
+    }
+    if (pin !== confirmPin) {
+      setErrorMsg(lang === 'ms' ? 'Pengesahan PIN tidak sepadan! Sila taip semula kedua-dua kotak.' : 'PIN confirmation does not match! Please retype.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      // Sulitkan token rahsia menggunakan PIN baharu
+      const verifier = await encryptData(AUTH_SECRET_TEXT, pin);
+      saveStoredSetting(VERIFIER_KEY, verifier);
+      setHasMasterPin(true);
+      setIsUnlocked(true);
+      setConfirmPin('');
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(lang === 'ms' ? 'Gagal menetapkan PIN keselamatan.' : 'Failed to setup security PIN.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 2. Buka Peti Kebal dengan Pengesahan Kunci
   const handleUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pin || pin.length < 4) {
-      setErrorMsg(lang === 'ms' ? 'PIN mestilah sekurang-kurangnya 4 aksara.' : 'PIN must be at least 4 characters.');
+      setErrorMsg(lang === 'ms' ? 'Sila masukkan PIN yang sah.' : 'Please enter a valid PIN.');
       return;
     }
 
     setErrorMsg(null);
-    setLoadingItems(true);
+    setLoading(true);
+
     try {
+      const verifier = getStoredSetting<VaultAuthVerifier | null>(VERIFIER_KEY, null);
+
+      if (verifier) {
+        try {
+          const decryptedToken = await decryptData(verifier.ciphertext, verifier.iv, verifier.salt, pin);
+          if (decryptedToken !== AUTH_SECRET_TEXT) {
+            throw new Error('PIN Salah');
+          }
+        } catch {
+          setErrorMsg(lang === 'ms' ? 'PIN salah! Akses ditolak.' : 'Incorrect PIN! Access denied.');
+          setLoading(false);
+          return;
+        }
+      } else {
+        // Kes migrasi dari versi lama
+        const stored = await getVaultItems();
+        if ((stored as VaultItem[]).length > 0) {
+          const sample = (stored as VaultItem[])[0];
+          try {
+            await decryptData(sample.ciphertext, sample.iv, sample.salt, pin);
+            const newVerifier = await encryptData(AUTH_SECRET_TEXT, pin);
+            saveStoredSetting(VERIFIER_KEY, newVerifier);
+            setHasMasterPin(true);
+          } catch {
+            setErrorMsg(lang === 'ms' ? 'PIN salah untuk fail sedia ada.' : 'Incorrect PIN for existing files.');
+            setLoading(false);
+            return;
+          }
+        } else {
+          setHasMasterPin(false);
+          setLoading(false);
+          return;
+        }
+      }
+
       const stored = await getVaultItems();
       setItems(stored as VaultItem[]);
       setIsUnlocked(true);
     } catch (err) {
       console.error('Ralat storan:', err);
-      setErrorMsg(lang === 'ms' ? 'Gagal mengakses storan selamat.' : 'Failed to access secure storage.');
+      setErrorMsg(lang === 'ms' ? 'Ralat mengakses storan.' : 'Failed to access storage.');
     } finally {
-      setLoadingItems(false);
+      setLoading(false);
+    }
+  };
+
+  // 3. Fungsi Padam Bersih Semua Fail & Set Semula Peti Kebal (Self-Destruct Wipe)
+  const handleWipeAndResetVault = async () => {
+    setLoading(true);
+    try {
+      // Padam semua fail tersimpan daripada IndexedDB
+      const stored = await getVaultItems();
+      for (const item of (stored as VaultItem[])) {
+        await deleteVaultItem(item.id);
+      }
+
+      // Padam token keselamatan PIN
+      saveStoredSetting(VERIFIER_KEY, null);
+
+      // Kemas kini state kembali ke mod persediaan awal
+      setItems([]);
+      setDecryptedContents({});
+      setPin('');
+      setConfirmPin('');
+      setHasMasterPin(false);
+      setIsUnlocked(false);
+      setShowResetModal(false);
+      setErrorMsg(null);
+    } catch (err) {
+      console.error('Ralat semasa membersihkan peti kebal:', err);
+      setErrorMsg(lang === 'ms' ? 'Gagal membersihkan data.' : 'Failed to wipe data.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -86,10 +201,9 @@ export const SecureVaultTool: React.FC<Props> = ({ lang, onBack }) => {
     }
   };
 
-  // Nyahsulitkan (Decrypt) Item untuk Dipaparkan
+  // Nyahsulitkan Item untuk Dipaparkan
   const toggleViewItem = async (item: VaultItem) => {
     if (decryptedContents[item.id]) {
-      // Sembunyikan jika sudah dibuka
       const next = { ...decryptedContents };
       delete next[item.id];
       setDecryptedContents(next);
@@ -100,13 +214,13 @@ export const SecureVaultTool: React.FC<Props> = ({ lang, onBack }) => {
       const plain = await decryptData(item.ciphertext, item.iv, item.salt, pin);
       setDecryptedContents((prev) => ({ ...prev, [item.id]: plain }));
     } catch {
-      alert(lang === 'ms' ? 'PIN tidak sepadan untuk menyahsulitkan fail ini.' : 'Invalid PIN for this item.');
+      alert(lang === 'ms' ? 'Gagal menyahsulitkan fail ini.' : 'Failed to decrypt this item.');
     }
   };
 
   // Padam Item daripada Peti Kebal
   const handleDeleteItem = async (id: string) => {
-    if (confirm(lang === 'ms' ? 'Adakah anda pasti mahu memadamkan item ini?' : 'Delete this item permanently?')) {
+    if (confirm(lang === 'ms' ? 'Padam item ini secara kekal?' : 'Delete this item permanently?')) {
       await deleteVaultItem(id);
       setItems((prev) => prev.filter((i) => i.id !== id));
       const next = { ...decryptedContents };
@@ -119,6 +233,8 @@ export const SecureVaultTool: React.FC<Props> = ({ lang, onBack }) => {
   const handleLock = () => {
     setIsUnlocked(false);
     setPin('');
+    setConfirmPin('');
+    setErrorMsg(null);
     setDecryptedContents({});
     setItems([]);
   };
@@ -143,7 +259,7 @@ export const SecureVaultTool: React.FC<Props> = ({ lang, onBack }) => {
               {lang === 'ms' ? 'Peti Kebal Rahsia (Vault)' : 'Secure Vault'}
             </h2>
             <p className="text-xs text-slate-400">
-              {lang === 'ms' ? 'Simpan nota & fail tersulit (AES-256)' : 'Encrypted notes & secret files'}
+              {lang === 'ms' ? 'Penyulitan Perkakasan AES-256' : 'Hardware AES-256 Encryption'}
             </p>
           </div>
         </div>
@@ -160,49 +276,106 @@ export const SecureVaultTool: React.FC<Props> = ({ lang, onBack }) => {
       </div>
 
       <div className="p-4 max-w-md mx-auto w-full flex-1 flex flex-col gap-5">
-        {/* ===================== SKRIN KUNCI / LOGIN ===================== */}
+        {/* ===================== SKRIN KUNCI / DAFTAR PIN ===================== */}
         {!isUnlocked ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-5 text-center">
-            <div className="w-20 h-20 rounded-3xl bg-blue-600/20 text-blue-400 flex items-center justify-center border border-blue-500/30 shadow-2xl">
-              <Lock className="w-10 h-10" />
+          <div className="flex flex-col items-center justify-center py-6 gap-4 text-center">
+            <div className="w-16 h-16 rounded-3xl bg-blue-600/20 text-blue-400 flex items-center justify-center border border-blue-500/30 shadow-2xl">
+              {hasMasterPin ? <Lock className="w-8 h-8" /> : <Key className="w-8 h-8 text-amber-400" />}
             </div>
 
             <div>
               <h3 className="text-xl font-bold text-white">
-                {lang === 'ms' ? 'Masukkan PIN Peti Kebal' : 'Enter Vault PIN'}
+                {!hasMasterPin
+                  ? lang === 'ms' ? 'Tetapkan PIN Peti Kebal' : 'Setup Vault PIN'
+                  : lang === 'ms' ? 'Masukkan PIN Peti Kebal' : 'Enter Vault PIN'}
               </h3>
               <p className="text-xs text-slate-400 max-w-xs mt-1">
-                {lang === 'ms'
-                  ? 'Data disulitkan secara tempatan dengan AES-GCM 256-bit menggunakan PIN ini.'
-                  : 'Data is encrypted locally with AES-GCM 256 using this PIN.'}
+                {!hasMasterPin
+                  ? lang === 'ms'
+                    ? 'Cipta PIN peribadi untuk menyulitkan data secara luar talian pada peranti ini.'
+                    : 'Create a master PIN to encrypt data locally on this device.'
+                  : lang === 'ms'
+                  ? 'Masukkan PIN yang tepat untuk menyahsulitkan peti kebal peribadi anda.'
+                  : 'Enter your PIN to decrypt the private vault.'}
               </p>
             </div>
 
-            <form onSubmit={handleUnlock} className="w-full max-w-xs flex flex-col gap-3">
+            {/* Kotak Amaran Kritikal Semasa Tetapan Kali Pertama */}
+            {!hasMasterPin && (
+              <div className="w-full p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-left flex gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-200/90 leading-relaxed">
+                  <span className="font-bold text-amber-400 block mb-0.5">
+                    {lang === 'ms' ? 'PERINGATAN PENTING:' : 'CRITICAL WARNING:'}
+                  </span>
+                  {lang === 'ms'
+                    ? 'Masukkan PIN anda sebanyak 2 KALI dengan teliti. Tiada pangkalan data awan untuk memulihkan kata laluan. Jika terlupa PIN atau menekan butang set semula nanti, SEMUA fail tersimpan akan DIPADAM KEKAL!'
+                    : 'Enter your PIN TWICE carefully. There is no cloud recovery. If you forget your PIN or reset the vault, ALL stored files will be PERMANENTLY ERASED!'}
+                </div>
+              </div>
+            )}
+
+            <form
+              onSubmit={!hasMasterPin ? handleCreateMasterPin : handleUnlock}
+              className="w-full max-w-xs flex flex-col gap-3"
+            >
               <input
                 type="password"
                 inputMode="numeric"
-                maxLength={12}
+                maxLength={8}
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
-                placeholder={lang === 'ms' ? 'PIN 4-8 digit...' : '4-8 digit PIN...'}
+                placeholder={!hasMasterPin ? (lang === 'ms' ? '1. Masukkan PIN (4-8 digit)' : '1. Enter PIN (4-8 digits)') : (lang === 'ms' ? 'PIN 4-8 digit...' : 'Enter PIN...')}
                 className="w-full p-3.5 text-center rounded-xl bg-slate-900 border border-slate-700 text-white text-lg font-mono tracking-widest focus:outline-none focus:border-blue-500"
                 autoFocus
               />
 
+              {!hasMasterPin && (
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={8}
+                  value={confirmPin}
+                  onChange={(e) => setConfirmPin(e.target.value)}
+                  placeholder={lang === 'ms' ? '2. Sahkan PIN sekali lagi' : '2. Confirm PIN again'}
+                  className="w-full p-3.5 text-center rounded-xl bg-slate-900 border border-slate-700 text-white text-lg font-mono tracking-widest focus:outline-none focus:border-blue-500"
+                />
+              )}
+
               {errorMsg && (
-                <div className="p-2.5 rounded-xl bg-red-950/60 border border-red-700/50 text-red-200 text-xs">
+                <div className="p-2.5 rounded-xl bg-red-950/60 border border-red-700/50 text-red-200 text-xs animate-in fade-in">
                   {errorMsg}
                 </div>
               )}
 
               <button
                 type="submit"
-                className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-900/40 active:scale-[0.98] transition flex items-center justify-center gap-2"
+                disabled={loading}
+                className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-900/40 active:scale-[0.98] transition flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                <Unlock className="w-4 h-4" />
-                {lang === 'ms' ? 'Buka Peti Kebal' : 'Unlock Vault'}
+                {!hasMasterPin ? (
+                  <>
+                    <Key className="w-4 h-4" />
+                    <span>{lang === 'ms' ? 'Sahkan PIN & Buka Peti' : 'Confirm PIN & Unlock'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Unlock className="w-4 h-4" />
+                    <span>{lang === 'ms' ? 'Buka Peti Kebal' : 'Unlock Vault'}</span>
+                  </>
+                )}
               </button>
+
+              {/* Butang Lupa PIN / Reset Semula (Cuma keluar jika sudah ada master PIN) */}
+              {hasMasterPin && (
+                <button
+                  type="button"
+                  onClick={() => setShowResetModal(true)}
+                  className="mt-2 text-xs text-rose-400 hover:text-rose-300 underline font-medium transition"
+                >
+                  {lang === 'ms' ? 'Terlupa PIN? Set Semula Peti Kebal' : 'Forgot PIN? Reset Vault'}
+                </button>
+              )}
             </form>
           </div>
         ) : (
@@ -274,10 +447,48 @@ export const SecureVaultTool: React.FC<Props> = ({ lang, onBack }) => {
           </div>
         )}
 
+        {/* Modal Amaran Set Semula / Padam Bersih (Wipe & Reset Modal) */}
+        {showResetModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="w-full max-w-sm rounded-2xl bg-[#121e36] border border-red-500/40 p-5 shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in-95">
+              <div className="flex items-center gap-3 text-rose-400">
+                <AlertOctagon className="w-7 h-7 shrink-0 text-red-500" />
+                <h3 className="text-base font-bold text-white">
+                  {lang === 'ms' ? 'Padam & Set Semula?' : 'Wipe & Reset Vault?'}
+                </h3>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed">
+                {lang === 'ms'
+                  ? 'Demi keselamatan data peribadi anda, menetapkan semula PIN akan MEMADAM SEMUA FAIL, NOTA, DAN KATA LALUAN di dalam peti kebal ini secara kekal. Tindakan ini tidak boleh diundur!'
+                  : 'For your security, resetting the PIN will PERMANENTLY ERASE ALL STORED DATA in this vault. This action cannot be undone!'}
+              </p>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowResetModal(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition"
+                >
+                  {lang === 'ms' ? 'Batal' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={handleWipeAndResetVault}
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-lg shadow-red-900/50 transition"
+                >
+                  {lang === 'ms' ? 'Ya, Padam Semua' : 'Yes, Wipe All'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modal Tambah Item Baharu */}
         {showAddModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-            <div className="w-full max-w-sm rounded-2xl bg-[#121e36] border border-slate-700 p-5 shadow-2xl flex flex-col gap-4">
+            <div className="w-full max-w-sm rounded-2xl bg-[#121e36] border border-slate-700 p-5 shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in-95">
               <h3 className="text-base font-bold text-white">
                 {lang === 'ms' ? 'Simpan Maklumat Rahsia' : 'Save Encrypted Secret'}
               </h3>
@@ -323,14 +534,14 @@ export const SecureVaultTool: React.FC<Props> = ({ lang, onBack }) => {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
+                  className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition"
                 >
                   {lang === 'ms' ? 'Batal' : 'Cancel'}
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveItem}
-                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold"
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow transition"
                 >
                   {lang === 'ms' ? 'Sulitkan & Simpan' : 'Encrypt & Save'}
                 </button>
