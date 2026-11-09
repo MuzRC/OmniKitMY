@@ -23,11 +23,12 @@ jobs:
         with:
           node-version: 20
 
-      - name: Setup Java JDK 17
+      # Naikkan ke Java 21 untuk padankan keperluan Capacitor terkini
+      - name: Setup Java JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       # 1. Pasang dependency & compile fail web Vite ke folder dist
       - name: Install Web Dependencies & Build
@@ -42,7 +43,7 @@ jobs:
           npx cap add android
           npx cap sync android
 
-      # 3. Suntik permission sensor, kamera & audio guna Node.js (bebas ralat sed)
+      # 3. Suntik permission sensor, kamera & audio guna Node.js
       - name: Inject Android Permissions
         run: |
           node -e '
