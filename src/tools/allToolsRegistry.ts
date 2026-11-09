@@ -270,14 +270,14 @@ export const ALL_TOOLS: ToolEntry[] = [
       en: 'Developer Tools',
     },
     description: {
-      ms: 'Penjana UUID, hash kripto SHA-256, format JSON & penguji Regex',
-      en: 'UUID generator, SHA-256 hashes, JSON beautifier & Regex tester',
+      ms: 'UUID, hash SHA-256/512, format JSON, penguji Regex & Base64',
+      en: 'UUID, SHA-256/512 hashes, JSON formatter, Regex & Base64 tool',
     },
     category: 'developer',
     iconName: 'Code',
     iconBgColor: 'bg-indigo-500/20',
     iconColor: 'text-indigo-400',
-    keywords: ['dev', 'developer', 'uuid', 'hash', 'json', 'regex', 'timestamp'],
+    keywords: ['dev', 'developer', 'uuid', 'hash', 'json', 'regex', 'timestamp', 'base64', 'encode', 'decode', 'b64'],
     component: DeveloperTools,
   },
   {
