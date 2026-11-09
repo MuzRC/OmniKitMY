@@ -35,6 +35,12 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      # 2.1 Salin & ganti ikon aplikasi 3D baharu dari folder android-res
+      - name: Copy Custom App Icons
+        run: |
+          echo "Menyalin ikon kustom ke dalam folder res Android..."
+          cp -rf android-res/* android/app/src/main/res/
+
       # 3. Selesaikan isu duplicate class Kotlin (exclude jdk7 & jdk8 lapuk)
       - name: Fix Kotlin Duplicate Classes
         run: |
