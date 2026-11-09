@@ -23,7 +23,6 @@ jobs:
         with:
           node-version: 20
 
-      # Naikkan ke Java 21 untuk padankan keperluan Capacitor terkini
       - name: Setup Java JDK 21
         uses: actions/setup-java@v4
         with:
@@ -43,7 +42,18 @@ jobs:
           npx cap add android
           npx cap sync android
 
-      # 3. Suntik permission sensor, kamera & audio guna Node.js
+      # 3. Selesaikan isu duplicate class Kotlin (exclude jdk7 & jdk8 lapuk)
+      - name: Fix Kotlin Duplicate Classes
+        run: |
+          cat << 'EOF' >> android/app/build.gradle
+
+          configurations.all {
+              exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+              exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+          }
+          EOF
+
+      # 4. Suntik permission sensor, kamera & audio guna Node.js
       - name: Inject Android Permissions
         run: |
           node -e '
@@ -67,14 +77,14 @@ jobs:
           console.log("Permissions berjaya disuntik!");
           '
 
-      # 4. Compile Release APK (Unsigned) guna Gradle
+      # 5. Compile Release APK (Unsigned) guna Gradle
       - name: Build Android Release APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
 
-      # 5. Tandatangani APK guna GitHub Secrets
+      # 6. Tandatangani APK guna GitHub Secrets
       - name: Sign APK
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.jks
@@ -90,7 +100,7 @@ jobs:
 
           rm -f release.jks
 
-      # 6. Simpan fail APK siap ditandatangani untuk dimuat turun
+      # 7. Simpan fail APK siap ditandatangani untuk dimuat turun
       - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
