@@ -1,0 +1,14 @@
+{
+  "name": "OmniKitMY",
+  "description": "Kit alatan pintar serba boleh (Swiss Army Knife) Android dengan alatan audio, sensor, ukuran, QR, visual dan keselamatan luar talian dalam Bahasa Melayu.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "accelerometer",
+    "gyroscope",
+    "magnetometer"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
