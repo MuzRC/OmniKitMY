@@ -8,10 +8,11 @@
  * 3. Penguji Ungkapan Nalar (Regex Tester) dengan pemadanan teks interaktif.
  * 4. Pemformat & Pengesah JSON (JSON Beautifier & Minifier).
  * 5. Penukar Cap Masa Unix (Unix Timestamp to DateTime Converter).
+ * 6. Pengekod & Penyahkod Base64 selamat dengan sokongan penuh UTF-8.
  */
 
 import React, { useState } from 'react';
-import { ArrowLeft, Code, Copy, Check, Hash, RefreshCw, Terminal, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Code, Copy, Check, Hash, RefreshCw, Terminal, CheckCircle2, AlertCircle, ArrowUpDown } from 'lucide-react';
 import { Language } from '../types/tool';
 
 interface Props {
@@ -19,7 +20,7 @@ interface Props {
   onBack: () => void;
 }
 
-type Tab = 'uuid' | 'hash' | 'json' | 'regex' | 'timestamp';
+type Tab = 'uuid' | 'hash' | 'json' | 'regex' | 'timestamp' | 'base64';
 
 export const DeveloperTools: React.FC<Props> = ({ lang, onBack }) => {
   const [activeTab, setActiveTab] = useState<Tab>('uuid');
@@ -44,6 +45,12 @@ export const DeveloperTools: React.FC<Props> = ({ lang, onBack }) => {
 
   // Keadaan Cap Masa
   const [timestampInput, setTimestampInput] = useState<string>(Math.floor(Date.now() / 1000).toString());
+
+  // Keadaan Base64
+  const [base64Input, setBase64Input] = useState<string>('OmniKitMY');
+  const [base64Output, setBase64Output] = useState<string>('');
+  const [base64Mode, setBase64Mode] = useState<'encode' | 'decode'>('encode');
+  const [base64Error, setBase64Error] = useState<string | null>(null);
 
   const copyVal = (val: string, key: string) => {
     navigator.clipboard.writeText(val);
@@ -101,6 +108,45 @@ export const DeveloperTools: React.FC<Props> = ({ lang, onBack }) => {
     setUuids(list);
   };
 
+  // Kendali Proses Base64 (Encode / Decode dengan perlindungan UTF-8)
+  const handleBase64Process = (text: string, mode: 'encode' | 'decode') => {
+    setBase64Input(text);
+    setBase64Error(null);
+
+    if (!text) {
+      setBase64Output('');
+      return;
+    }
+
+    try {
+      if (mode === 'encode') {
+        const bytes = new TextEncoder().encode(text);
+        const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join('');
+        setBase64Output(btoa(binString));
+      } else {
+        const binString = atob(text.trim());
+        const bytes = Uint8Array.from(binString, (char) => char.codePointAt(0) ?? 0);
+        setBase64Output(new TextDecoder().decode(bytes));
+      }
+    } catch (err: unknown) {
+      setBase64Output('');
+      setBase64Error(
+        mode === 'decode'
+          ? (lang === 'ms' ? 'Format Base64 inda sah untuk dinyahkod.' : 'Invalid Base64 format to decode.')
+          : ((err as Error).message || 'Ralat semasa memproses Base64')
+      );
+    }
+  };
+
+  // Tukar kedudukan Input & Output Base64
+  const swapBase64 = () => {
+    if (!base64Output || base64Error) return;
+    const nextMode = base64Mode === 'encode' ? 'decode' : 'encode';
+    const nextInput = base64Output;
+    setBase64Mode(nextMode);
+    handleBase64Process(nextInput, nextMode);
+  };
+
   return (
     <div className="flex flex-col min-h-full pb-8">
       {/* Header */}
@@ -118,21 +164,22 @@ export const DeveloperTools: React.FC<Props> = ({ lang, onBack }) => {
               {lang === 'ms' ? 'Alatan Pembangun (DevTools)' : 'Developer Tools'}
             </h2>
             <p className="text-xs text-slate-400">
-              {lang === 'ms' ? 'UUID, Hash Kripto, Regex, JSON & Cap Masa' : 'UUID, Crypto Hashes, Regex, JSON & Timestamps'}
+              {lang === 'ms' ? 'UUID, Hash, Regex, JSON, Masa & Base64' : 'UUID, Hashes, Regex, JSON, Timestamps & Base64'}
             </p>
           </div>
         </div>
       </div>
 
       <div className="p-4 max-w-md mx-auto w-full flex-1 flex flex-col gap-5">
-        {/* Tab Pemilih */}
-        <div className="grid grid-cols-5 gap-1 p-1 bg-slate-900/90 rounded-2xl border border-slate-700/60 text-center">
+        {/* Tab Pemilih (6 Kolum) */}
+        <div className="grid grid-cols-6 gap-1 p-1 bg-slate-900/90 rounded-2xl border border-slate-700/60 text-center">
           {[
             { id: 'uuid', label: 'UUID' },
             { id: 'hash', label: 'Hash' },
             { id: 'json', label: 'JSON' },
             { id: 'regex', label: 'Regex' },
             { id: 'timestamp', label: 'Masa' },
+            { id: 'base64', label: 'Base64' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -141,8 +188,11 @@ export const DeveloperTools: React.FC<Props> = ({ lang, onBack }) => {
                 if (tab.id === 'hash' && !sha256Hash) {
                   calculateHashes(hashInput);
                 }
+                if (tab.id === 'base64' && !base64Output && !base64Error) {
+                  handleBase64Process(base64Input, base64Mode);
+                }
               }}
-              className={`py-2 px-1 rounded-xl text-xs font-semibold transition ${
+              className={`py-2 px-0.5 rounded-xl text-[11px] font-semibold transition ${
                 activeTab === tab.id
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
@@ -385,6 +435,112 @@ export const DeveloperTools: React.FC<Props> = ({ lang, onBack }) => {
                 </span>
               </div>
             </div>
+          </div>
+        )}
+
+{/* ===================== TAB 6: BASE64 ENCODER / DECODER ===================== */}
+        {activeTab === 'base64' && (
+          <div className="flex flex-col gap-4">
+            {/* Pemilih Mod & Butang Swap */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex p-1 bg-slate-900 rounded-xl border border-slate-700/60 w-full sm:w-auto">
+                <button
+                  onClick={() => {
+                    setBase64Mode('encode');
+                    handleBase64Process(base64Input, 'encode');
+                  }}
+                  className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    base64Mode === 'encode'
+                      ? 'bg-blue-600 text-white shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {lang === 'ms' ? 'Pengekod (Encode)' : 'Encode'}
+                </button>
+                <button
+                  onClick={() => {
+                    setBase64Mode('decode');
+                    handleBase64Process(base64Input, 'decode');
+                  }}
+                  className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    base64Mode === 'decode'
+                      ? 'bg-blue-600 text-white shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {lang === 'ms' ? 'Penyahkod (Decode)' : 'Decode'}
+                </button>
+              </div>
+
+              {base64Output && !base64Error && (
+                <button
+                  onClick={swapBase64}
+                  title={lang === 'ms' ? 'Tukar kedudukan input & hasil' : 'Swap input & output'}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold shrink-0 transition"
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{lang === 'ms' ? 'Tukar' : 'Swap'}</span>
+                </button>
+              )}
+            </div>
+
+            {/* Kotak Input */}
+            <div className="p-4 rounded-2xl bg-[#121e36] border border-slate-700/60 flex flex-col gap-2">
+              <label className="text-xs font-semibold text-slate-300">
+                {base64Mode === 'encode'
+                  ? (lang === 'ms' ? 'Teks untuk Dienkod:' : 'Text to Encode:')
+                  : (lang === 'ms' ? 'Rentetan Base64 untuk Dinyahkod:' : 'Base64 String to Decode:')}
+              </label>
+              <textarea
+                rows={4}
+                value={base64Input}
+                onChange={(e) => handleBase64Process(e.target.value, base64Mode)}
+                placeholder={
+                  base64Mode === 'encode'
+                    ? (lang === 'ms' ? 'Taip teks di sini...' : 'Type text here...')
+                    : (lang === 'ms' ? 'Tampal rentetan Base64 di sini...' : 'Paste Base64 string here...')
+                }
+                className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Paparan Ralat atau Hasil Output */}
+            {base64Error ? (
+              <div className="p-3 rounded-xl bg-red-950/60 border border-red-700/50 text-red-200 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                <span>{base64Error}</span>
+              </div>
+            ) : (
+              <div className="p-3 bg-[#121e36] rounded-xl border border-slate-700/60 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-bold text-slate-300">
+                    {base64Mode === 'encode'
+                      ? (lang === 'ms' ? 'Hasil Base64' : 'Base64 Output')
+                      : (lang === 'ms' ? 'Teks Asal (Dinyahkod)' : 'Decoded Text')}
+                  </span>
+                  {base64Output && (
+                    <button
+                      onClick={() => copyVal(base64Output, 'base64_result')}
+                      className="text-cyan-400 hover:underline flex items-center gap-1"
+                    >
+                      {copiedKey === 'base64_result' ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                      {lang === 'ms' ? 'Salin' : 'Copy'}
+                    </button>
+                  )}
+                </div>
+                <div className="p-3 bg-slate-900 rounded-lg font-mono text-xs text-cyan-300 break-all select-all min-h-[48px] whitespace-pre-wrap">
+                  {base64Output || (
+                    <span className="text-slate-500 italic">
+                      {lang === 'ms' ? 'Hasil akan dipaparkan di sini...' : 'Result will appear here...'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
