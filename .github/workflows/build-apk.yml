@@ -35,7 +35,7 @@ jobs:
           npx cap add android
           npx cap sync android
 
-      # 2.1 Buang adaptive icon Capacitor & salin ikon 3D baharu dari folder android-res
+      # 2.1 Buang adaptive icon Capacitor & salin ikon kustom dari android-res
       - name: Copy Custom App Icons
         run: |
           echo "Membuang adaptive icon XML bawaan Capacitor..."
@@ -43,6 +43,18 @@ jobs:
 
           echo "Menyalin ikon kustom ke dalam folder res Android..."
           cp -rf android-res/* android/app/src/main/res/
+
+      # 2.2 Naik taraf Gradle Wrapper ke 8.5 (selesaikan bug bcprov-jdk18on Multi-Release Jar)
+      - name: Upgrade Gradle Wrapper to 8.5
+        run: |
+          node -e '
+          const fs = require("fs");
+          const file = "android/gradle/wrapper/gradle-wrapper.properties";
+          let content = fs.readFileSync(file, "utf8");
+          content = content.replace(/distributionUrl=.*/, "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.5-all.zip");
+          fs.writeFileSync(file, content, "utf8");
+          console.log("Gradle Wrapper berjaya dinaik taraf ke 8.5!");
+          '
 
       # 3. Selesaikan isu duplicate class Kotlin (exclude jdk7 & jdk8 lapuk)
       - name: Fix Kotlin Duplicate Classes
@@ -79,12 +91,12 @@ jobs:
           console.log("Permissions berjaya disuntik!");
           '
 
-      # 5. Compile Release APK (Unsigned) guna Gradle
+      # 5. Compile Release APK (Unsigned) guna Gradle 8.5 (--no-daemon elak sangkut cache lock)
       - name: Build Android Release APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease --no-daemon
 
       # 6. Tandatangani APK guna GitHub Secrets
       - name: Sign APK
