@@ -1,21 +1,20 @@
 /**
  * @file src/App.tsx
- * @description Komponen Induk Aplikasi OmniKitMY (Main Application Container).
- * Menguruskan keadaan utama: Alatan aktif, Mod Gelap/Cerah, Pilihan Bahasa (BM/EN),
- * Carian Pantas, Penapis Kategori, Pengurusan Kegemaran, dan Navigasi Skrin Penuh.
+ * @description Komponen Induk Aplikasi OmniKitMY (Versi Android Natif Bersih).
+ * Dilengkapi kawalan butang Back Android: kembali ke katalog dari alatan,
+ * dan notifikasi toast 'Tekan sekali lagi untuk keluar' di skrin utama.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Header } from './components/Header';
 import { CategoryFilter } from './components/CategoryFilter';
 import { ToolCard } from './components/ToolCard';
-import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
-import { ALL_TOOLS, ToolEntry } from './tools/allToolsRegistry';
+import { ALL_TOOLS } from './tools/allToolsRegistry';
 import { ToolCategory, Language } from './types/tool';
 import { getFavorites, toggleFavorite, getStoredSetting, saveStoredSetting } from './services/storage';
 import { getTranslation } from './services/i18n';
-import { Sparkles, Heart, SearchX } from 'lucide-react';
+import { Heart, SearchX } from 'lucide-react';
 
 export default function App() {
   // Tetapan Bahasa (Lalai: Bahasa Melayu 'ms')
@@ -24,7 +23,7 @@ export default function App() {
   // Tetapan Tema Mod Gelap (Lalai: Gelap 'dark')
   const [isDark, setIsDark] = useState<boolean>(() => getStoredSetting<boolean>('is_dark', true));
 
-  // Keadaan Penapis
+  // Keadaan Penapis & Carian
   const [selectedCategory, setSelectedCategory] = useState<ToolCategory>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showOnlyFavorites, setShowOnlyFavorites] = useState<boolean>(false);
@@ -33,7 +32,23 @@ export default function App() {
   const [favorites, setFavorites] = useState<string[]>(() => getFavorites());
 
   // Alatan Aktif yang Dibuka
-  const [activeToolId, setActiveToolId] = useState<string | null>(null);
+  const [activeToolId, setActiveToolId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hashId = window.location.hash.replace('#', '');
+      if (ALL_TOOLS.some((t) => t.id === hashId)) return hashId;
+    }
+    return null;
+  });
+
+  // State & Ref untuk Notifikasi 'Tekan Sekali Lagi untuk Keluar'
+  const [showExitToast, setShowExitToast] = useState<boolean>(false);
+  const lastBackPressRef = useRef<number>(0);
+  const activeToolIdRef = useRef<string | null>(activeToolId);
+
+  // Pastikan ref sentiasa segerak dengan state alatan semasa
+  useEffect(() => {
+    activeToolIdRef.current = activeToolId;
+  }, [activeToolId]);
 
   const t = getTranslation(lang);
 
@@ -49,32 +64,85 @@ export default function App() {
     }
   }, [isDark]);
 
-  // Simpan tetapan bahasa
+  // Pengesan Butang Back Android + Kawalan Keluar Bertingkat
+  useEffect(() => {
+    // Sediakan sejarah asas supaya webview ada ruang tangkap butang back
+    window.history.replaceState({ page: 'root' }, '');
+    window.history.pushState({ page: 'home' }, '');
+
+    let toastTimer: any = null;
+
+    const handlePopState = () => {
+      // 1. Kalau sedang berada di dalam mana-mana alatan, tutup alatan & kembali ke menu utama
+      if (activeToolIdRef.current !== null) {
+        setActiveToolId(null);
+        return;
+      }
+
+      // 2. Kalau sudah sedia berada di skrin utama (Katalog Alatan)
+      const now = Date.now();
+      if (now - lastBackPressRef.current < 2000) {
+        // Ditekan kali kedua dalam masa 2 saat: benarkan app keluar
+        setShowExitToast(false);
+        if ((navigator as any).app?.exitApp) {
+          (navigator as any).app.exitApp();
+        } else {
+          window.history.back();
+        }
+      } else {
+        // Ditekan kali pertama: catat masa, papar toast notifikasi & suntik guard semula
+        lastBackPressRef.current = now;
+        setShowExitToast(true);
+
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          setShowExitToast(false);
+        }, 2000);
+
+        // Pasang balik state 'home' supaya sejarah pelayar tidak kosong
+        window.history.pushState({ page: 'home' }, '');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      clearTimeout(toastTimer);
+    };
+  }, []);
+
+  // Buka alatan & tambah rekod sejarah
+  const handleOpenTool = (toolId: string) => {
+    window.history.pushState({ toolId }, '', `#${toolId}`);
+    setActiveToolId(toolId);
+  };
+
+  // Butang kembali manual (anak panah header alatan)
+  const handleBack = () => {
+    window.history.back();
+  };
+
   const handleLanguageChange = (newLang: Language) => {
     setLang(newLang);
     saveStoredSetting('language', newLang);
   };
 
-  // Togol Kegemaran
   const handleToggleFavorite = (toolId: string) => {
     const updated = toggleFavorite(toolId);
     setFavorites(updated);
   };
 
-  // Alatan yang telah ditapis mengikut carian, kategori, dan kegemaran
+  // Tapis alatan mengikut carian, kategori, dan kegemaran
   const filteredTools = useMemo(() => {
     return ALL_TOOLS.filter((tool) => {
-      // Penapis Kegemaran
       if (showOnlyFavorites && !favorites.includes(tool.id)) {
         return false;
       }
 
-      // Penapis Kategori
       if (selectedCategory !== 'all' && tool.category !== selectedCategory) {
         return false;
       }
 
-      // Penapis Carian
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         const nameMs = tool.name.ms.toLowerCase();
@@ -98,7 +166,6 @@ export default function App() {
     });
   }, [selectedCategory, searchQuery, showOnlyFavorites, favorites]);
 
-  // Cari alatan aktif jika ada
   const activeTool = useMemo(() => {
     if (!activeToolId) return null;
     return ALL_TOOLS.find((t) => t.id === activeToolId) || null;
@@ -111,7 +178,7 @@ export default function App() {
         <main className="flex-1 flex flex-col">
           <activeTool.component
             lang={lang}
-            onBack={() => setActiveToolId(null)}
+            onBack={handleBack}
           />
         </main>
       ) : (
@@ -130,11 +197,6 @@ export default function App() {
             totalTools={ALL_TOOLS.length}
           />
 
-          {/* Banner PWA Pasang di Android */}
-          <div className="max-w-5xl mx-auto w-full">
-            <PWAInstallButton lang={lang} />
-          </div>
-
           {/* Bar Penapis Kategori Alatan */}
           <div className="max-w-5xl mx-auto w-full">
             <CategoryFilter
@@ -146,7 +208,6 @@ export default function App() {
 
           {/* Kandungan Grid Alatan */}
           <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-3">
-            {/* Tajuk Bahagian & Kaunter Alatan Dipaparkan */}
             <div className="flex items-center justify-between mb-3 px-1">
               <span className="text-xs font-semibold text-slate-400">
                 {showOnlyFavorites
@@ -168,7 +229,7 @@ export default function App() {
               )}
             </div>
 
-            {/* Grid 2-Lajur pada Telefon, 3-4 Lajur pada Skrin Lebar */}
+            {/* Grid 2-Lajur */}
             {filteredTools.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                 {filteredTools.map((tool) => (
@@ -178,12 +239,11 @@ export default function App() {
                     lang={lang}
                     isFavorite={favorites.includes(tool.id)}
                     onToggleFavorite={() => handleToggleFavorite(tool.id)}
-                    onClick={() => setActiveToolId(tool.id)}
+                    onClick={() => handleOpenTool(tool.id)}
                   />
                 ))}
               </div>
             ) : (
-              /* Paparan Kosong jika tiada alatan sepadan */
               <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-slate-800/80 text-slate-500 flex items-center justify-center mb-3">
                   {showOnlyFavorites ? <Heart className="w-8 h-8" /> : <SearchX className="w-8 h-8" />}
@@ -216,6 +276,14 @@ export default function App() {
 
       {/* Penunjuk Status Luar Talian */}
       <OfflineIndicator lang={lang} />
+
+      {/* ===================== TOAST NOTIFIKASI DOUBLE-BACK ===================== */}
+      {showExitToast && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-slate-900/95 border border-slate-700/80 text-white text-xs font-medium shadow-2xl backdrop-blur-md pointer-events-none transition-all duration-200 animate-in fade-in zoom-in-95">
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+          <span>{lang === 'ms' ? 'Tekan sekali lagi untuk keluar' : 'Press back again to exit'}</span>
+        </div>
+      )}
     </div>
   );
 }
