@@ -3,6 +3,11 @@ name: Build & Sign Android APK
 on:
   push:
     branches: [ main, master ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - '.env.example'
+      - 'LICENSE'
   workflow_dispatch:
 
 jobs:
@@ -24,45 +29,51 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # Pasang dependency & compile fail web Vite
+      # 1. Pasang dependency & compile fail web Vite ke folder dist
       - name: Install Web Dependencies & Build
         run: |
           npm install --legacy-peer-deps
           npm run build
 
-      # Pasang Capacitor & jana platform Android
+      # 2. Pasang Capacitor & setup perumah Android secara automatik
       - name: Setup Capacitor Android
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android --legacy-peer-deps
           npx cap add android
           npx cap sync android
 
-      # Masukkan permission perkakasan ke AndroidManifest
+      # 3. Suntik permission sensor, kamera & audio guna Node.js (bebas ralat sed)
       - name: Inject Android Permissions
         run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          PERMISSIONS="
-              <uses-permission android:name=\"android.permission.CAMERA\" />
-              <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />
-              <uses-permission android:name=\"android.permission.MODIFY_AUDIO_SETTINGS\" />
-              <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />
-              <uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\" />
-              <uses-permission android:name=\"android.permission.BLUETOOTH\" />
-              <uses-permission android:name=\"android.permission.BLUETOOTH_ADMIN\" />
-              <uses-permission android:name=\"android.permission.BLUETOOTH_SCAN\" />
-              <uses-permission android:name=\"android.permission.BLUETOOTH_CONNECT\" />
-              <uses-permission android:name=\"android.permission.VIBRATE\" />
-          "
-          sed -i "/<application/i $PERMISSIONS" $MANIFEST
+          node -e '
+          const fs = require("fs");
+          const file = "android/app/src/main/AndroidManifest.xml";
+          let xml = fs.readFileSync(file, "utf8");
+          const perms = `
+              <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.RECORD_AUDIO" />
+              <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+              <uses-permission android:name="android.permission.BLUETOOTH" />
+              <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+              <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+              <uses-permission android:name="android.permission.VIBRATE" />
+          `;
+          xml = xml.replace("<application", perms + "\n    <application");
+          fs.writeFileSync(file, xml, "utf8");
+          console.log("Permissions berjaya disuntik!");
+          '
 
-      # Build APK Release guna Gradle sedia ada dalam perumah
+      # 4. Compile Release APK (Unsigned) guna Gradle
       - name: Build Android Release APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
 
-      # Tandatangani fail APK guna Secrets
+      # 5. Tandatangani APK guna GitHub Secrets
       - name: Sign APK
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.jks
@@ -78,8 +89,8 @@ jobs:
 
           rm -f release.jks
 
-      # Simpan hasil binaan APK
-      - name: Upload Artifact
+      # 6. Simpan fail APK siap ditandatangani untuk dimuat turun
+      - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
           name: OmniKit-Signed-Release-APK
