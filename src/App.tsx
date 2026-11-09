@@ -1,11 +1,13 @@
 /**
  * @file src/App.tsx
- * @description Komponen Induk Aplikasi OmniKitMY (Versi Android Natif Bersih).
- * Dilengkapi kawalan butang Back Android: kembali ke katalog dari alatan,
- * dan notifikasi toast 'Tekan sekali lagi untuk keluar' di skrin utama.
+ * @description Komponen Induk Aplikasi OmniKitMY (Natif Capacitor).
+ * Kawalan butang Back Android menggunakan @capacitor/app:
+ * 1. Tutup alatan jika berada di dalam sub-screen.
+ * 2. Double-tap back berserta toast jika di skrin utama untuk exit.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { App as CapApp } from '@capacitor/app';
 import { Header } from './components/Header';
 import { CategoryFilter } from './components/CategoryFilter';
 import { ToolCard } from './components/ToolCard';
@@ -31,21 +33,14 @@ export default function App() {
   // Alatan Kegemaran
   const [favorites, setFavorites] = useState<string[]>(() => getFavorites());
 
-  // Alatan Aktif yang Dibuka
-  const [activeToolId, setActiveToolId] = useState<string | null>(() => {
-    if (typeof window !== 'undefined' && window.location.hash) {
-      const hashId = window.location.hash.replace('#', '');
-      if (ALL_TOOLS.some((t) => t.id === hashId)) return hashId;
-    }
-    return null;
-  });
+  // Alatan Aktif
+  const [activeToolId, setActiveToolId] = useState<string | null>(null);
 
-  // State & Ref untuk Notifikasi 'Tekan Sekali Lagi untuk Keluar'
-  const [showExitToast, setShowExitToast] = useState<boolean>(false);
-  const lastBackPressRef = useRef<number>(0);
+  // Rujukan untuk listener natif
   const activeToolIdRef = useRef<string | null>(activeToolId);
+  const lastBackPressRef = useRef<number>(0);
+  const [showExitToast, setShowExitToast] = useState<boolean>(false);
 
-  // Pastikan ref sentiasa segerak dengan state alatan semasa
   useEffect(() => {
     activeToolIdRef.current = activeToolId;
   }, [activeToolId]);
@@ -64,33 +59,23 @@ export default function App() {
     }
   }, [isDark]);
 
-  // Pengesan Butang Back Android + Kawalan Keluar Bertingkat
+  // ===================== KAWALAN BACK BUTTON CAPACITOR =====================
   useEffect(() => {
-    // Sediakan sejarah asas supaya webview ada ruang tangkap butang back
-    window.history.replaceState({ page: 'root' }, '');
-    window.history.pushState({ page: 'home' }, '');
-
     let toastTimer: any = null;
 
-    const handlePopState = () => {
-      // 1. Kalau sedang berada di dalam mana-mana alatan, tutup alatan & kembali ke menu utama
+    const backListenerPromise = CapApp.addListener('backButton', () => {
+      // 1. Kalau sedang berada dalam alatan, kembali ke menu utama
       if (activeToolIdRef.current !== null) {
         setActiveToolId(null);
         return;
       }
 
-      // 2. Kalau sudah sedia berada di skrin utama (Katalog Alatan)
+      // 2. Kalau di menu utama, semak jeda masa 2 saat (Double-tap to exit)
       const now = Date.now();
       if (now - lastBackPressRef.current < 2000) {
-        // Ditekan kali kedua dalam masa 2 saat: benarkan app keluar
         setShowExitToast(false);
-        if ((navigator as any).app?.exitApp) {
-          (navigator as any).app.exitApp();
-        } else {
-          window.history.back();
-        }
+        CapApp.exitApp(); // Panggil fungsi natif untuk tutup app
       } else {
-        // Ditekan kali pertama: catat masa, papar toast notifikasi & suntik guard semula
         lastBackPressRef.current = now;
         setShowExitToast(true);
 
@@ -98,29 +83,14 @@ export default function App() {
         toastTimer = setTimeout(() => {
           setShowExitToast(false);
         }, 2000);
-
-        // Pasang balik state 'home' supaya sejarah pelayar tidak kosong
-        window.history.pushState({ page: 'home' }, '');
       }
-    };
+    });
 
-    window.addEventListener('popstate', handlePopState);
     return () => {
-      window.removeEventListener('popstate', handlePopState);
+      backListenerPromise.then((handler) => handler.remove());
       clearTimeout(toastTimer);
     };
   }, []);
-
-  // Buka alatan & tambah rekod sejarah
-  const handleOpenTool = (toolId: string) => {
-    window.history.pushState({ toolId }, '', `#${toolId}`);
-    setActiveToolId(toolId);
-  };
-
-  // Butang kembali manual (anak panah header alatan)
-  const handleBack = () => {
-    window.history.back();
-  };
 
   const handleLanguageChange = (newLang: Language) => {
     setLang(newLang);
@@ -132,7 +102,7 @@ export default function App() {
     setFavorites(updated);
   };
 
-  // Tapis alatan mengikut carian, kategori, dan kegemaran
+  // Tapis alatan
   const filteredTools = useMemo(() => {
     return ALL_TOOLS.filter((tool) => {
       if (showOnlyFavorites && !favorites.includes(tool.id)) {
@@ -178,13 +148,12 @@ export default function App() {
         <main className="flex-1 flex flex-col">
           <activeTool.component
             lang={lang}
-            onBack={handleBack}
+            onBack={() => setActiveToolId(null)}
           />
         </main>
       ) : (
         /* ===================== PAPARAN UTAMA (KATALOG ALATAN) ===================== */
         <>
-          {/* Header Utama */}
           <Header
             lang={lang}
             onLanguageChange={handleLanguageChange}
@@ -197,7 +166,6 @@ export default function App() {
             totalTools={ALL_TOOLS.length}
           />
 
-          {/* Bar Penapis Kategori Alatan */}
           <div className="max-w-5xl mx-auto w-full">
             <CategoryFilter
               selectedCategory={selectedCategory}
@@ -206,7 +174,6 @@ export default function App() {
             />
           </div>
 
-          {/* Kandungan Grid Alatan */}
           <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-3">
             <div className="flex items-center justify-between mb-3 px-1">
               <span className="text-xs font-semibold text-slate-400">
@@ -229,7 +196,6 @@ export default function App() {
               )}
             </div>
 
-            {/* Grid 2-Lajur */}
             {filteredTools.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                 {filteredTools.map((tool) => (
@@ -239,7 +205,7 @@ export default function App() {
                     lang={lang}
                     isFavorite={favorites.includes(tool.id)}
                     onToggleFavorite={() => handleToggleFavorite(tool.id)}
-                    onClick={() => handleOpenTool(tool.id)}
+                    onClick={() => setActiveToolId(tool.id)}
                   />
                 ))}
               </div>
@@ -266,7 +232,6 @@ export default function App() {
             )}
           </main>
 
-          {/* Footer Aplikasi */}
           <footer className="mt-auto border-t border-slate-800/80 py-4 px-4 text-center text-[11px] text-slate-500">
             <p>{t.footerNote}</p>
             <p className="text-[10px] text-slate-600 mt-0.5">Versi Release 1.0 (Stabil) · Sifar Data Demo</p>
@@ -274,12 +239,11 @@ export default function App() {
         </>
       )}
 
-      {/* Penunjuk Status Luar Talian */}
       <OfflineIndicator lang={lang} />
 
-      {/* ===================== TOAST NOTIFIKASI DOUBLE-BACK ===================== */}
+      {/* ===================== TOAST NOTIFIKASI ===================== */}
       {showExitToast && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-slate-900/95 border border-slate-700/80 text-white text-xs font-medium shadow-2xl backdrop-blur-md pointer-events-none transition-all duration-200 animate-in fade-in zoom-in-95">
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-slate-900/95 border border-slate-700/80 text-white text-xs font-medium shadow-2xl backdrop-blur-md pointer-events-none transition-all duration-200">
           <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
           <span>{lang === 'ms' ? 'Tekan sekali lagi untuk keluar' : 'Press back again to exit'}</span>
         </div>
