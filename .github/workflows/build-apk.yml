@@ -1,6 +1,8 @@
 name: Build & Sign Android APK
 
 on:
+  push:
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -22,20 +24,20 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
+      # Pasang dependency & compile fail web Vite
       - name: Install Web Dependencies & Build
         run: |
           npm install --legacy-peer-deps
           npm run build
 
+      # Pasang Capacitor & jana platform Android
       - name: Setup Capacitor Android
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android --legacy-peer-deps
           npx cap add android
           npx cap sync android
 
+      # Masukkan permission perkakasan ke AndroidManifest
       - name: Inject Android Permissions
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
@@ -53,12 +55,14 @@ jobs:
           "
           sed -i "/<application/i $PERMISSIONS" $MANIFEST
 
+      # Build APK Release guna Gradle sedia ada dalam perumah
       - name: Build Android Release APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
 
+      # Tandatangani fail APK guna Secrets
       - name: Sign APK
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.jks
@@ -74,6 +78,7 @@ jobs:
 
           rm -f release.jks
 
+      # Simpan hasil binaan APK
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
