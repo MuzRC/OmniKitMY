@@ -1,0 +1,294 @@
+name: Build OmniKitMY Release APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  models: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-release:
+    name: Build, Version & Publish OmniKitMY
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: 2. Kira Versi & Jana Release Notes Mesra Pengguna (GitHub AI)
+        id: versioning
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TOTAL_COMMITS=$(git rev-list --count HEAD)
+
+          if [ "$TOTAL_COMMITS" -ge 100 ]; then
+            MAJOR=$((TOTAL_COMMITS / 100))
+            MINOR=$(((TOTAL_COMMITS / 10) % 10))
+            PATCH=$((TOTAL_COMMITS % 10))
+            APP_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          else
+            APP_VERSION="1.0.${TOTAL_COMMITS}"
+          fi
+
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$TOTAL_COMMITS" >> "$GITHUB_ENV"
+          export APP_VERSION
+          export VERSION_CODE
+
+          echo "Versi APK Dijana: v$APP_VERSION (Build Code: $TOTAL_COMMITS)"
+
+          python3 - << 'EOF'
+          import json, os, subprocess, urllib.request
+
+          app_ver = os.environ["APP_VERSION"]
+          token = os.environ["GITHUB_TOKEN"]
+
+          try:
+              last_tag = subprocess.check_output(
+                  ["git", "describe", "--tags", "--abbrev=0"],
+                  stderr=subprocess.DEVNULL
+              ).decode().strip()
+              raw_logs = subprocess.check_output(
+                  ["git", "log", f"{last_tag}..HEAD", "--pretty=format:- %s"]
+              ).decode().strip()
+          except Exception:
+              raw_logs = subprocess.check_output(
+                  ["git", "log", "-10", "--pretty=format:- %s"]
+              ).decode().strip()
+
+          if not raw_logs:
+              raw_logs = "- Penambahbaikan prestasi, kestabilan dan ketepatan alatan."
+
+          ai_summary = ""
+          try:
+              url = "https://models.github.ai/inference/chat/completions"
+              prompt = (
+                  "Tukarkan log commit teknikal berikut kepada nota kemas kini aplikasi (release notes) "
+                  "dalam Bahasa Melayu yang ringkas, mesra pengguna biasa, dan mudah difahami.\n"
+                  "Syarat:\n"
+                  "- Guna bullet point (- ).\n"
+                  "- Buang istilah teknikal pengaturcaraan, nama fail, atau hash commit.\n"
+                  "- Fokus kepada apa yang pengguna dapat atau masalah yang telah dibaiki.\n"
+                  "- Terus beri senarai bullet point tanpa ayat pengenalan atau penutup.\n\n"
+                  f"Log commit:\n{raw_logs}"
+              )
+              payload = json.dumps({
+                  "model": "openai/gpt-4o-mini",
+                  "messages": [{"role": "user", "content": prompt}],
+                  "temperature": 0.4
+              }).encode("utf-8")
+
+              req = urllib.request.Request(
+                  url,
+                  data=payload,
+                  headers={
+                      "Authorization": f"Bearer {token}",
+                      "Content-Type": "application/json"
+                  }
+              )
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  data = json.loads(resp.read().decode("utf-8"))
+                  ai_summary = data["choices"][0]["message"]["content"].strip()
+          except Exception as e:
+              print(f"Amaran GitHub AI gagal ({e}), guna log asal sebagai sandaran.")
+              ai_summary = raw_logs
+
+          with open("clean_notes.txt", "w", encoding="utf-8") as f:
+              f.write(ai_summary)
+
+          with open("release_notes.md", "w", encoding="utf-8") as f:
+              f.write(f"### Apa Yang Baharu dalam OmniKitMY v{app_ver}\n\n")
+              f.write(f"{ai_summary}\n")
+          EOF
+
+      - name: 3. Setup Java JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: 4. Kemas Kini Versi dalam Gradle
+        run: |
+          GRADLE_FILE="app/build.gradle.kts"
+          if [ -f "$GRADLE_FILE" ]; then
+            echo "Mengemas kini versi ke $APP_VERSION (code: $VERSION_CODE) dalam $GRADLE_FILE..."
+            sed -i "s/versionCode = [0-9]\+/versionCode = $VERSION_CODE/g" "$GRADLE_FILE"
+            sed -i "s/versionName = \"[^\"]*\"/versionName = \"$APP_VERSION\"/g" "$GRADLE_FILE"
+          else
+            echo "ERROR: $GRADLE_FILE tidak dijumpai."
+            exit 1
+          fi
+
+      - name: 5. Sediakan Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: 5b. Pastikan Gradle Wrapper Wujud
+        run: |
+          if [ ! -f "gradlew" ]; then
+            gradle wrapper --gradle-version 8.13
+          fi
+          chmod +x gradlew
+
+      - name: 6. Semak Secret Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "ERROR: KEYSTORE_BASE64 secret tidak ditetapkan."
+            exit 1
+          fi
+
+      - name: 7. Compile Release APK
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: 8. Zipalign & Sign APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          APK_DIR="app/build/outputs/apk/release"
+
+          if [ ! -d "$APK_DIR" ]; then
+            echo "ERROR: Folder $APK_DIR tidak wujud."
+            exit 1
+          fi
+
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > release.keystore
+
+          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)
+          echo "Build-Tools Digunakan: $BUILD_TOOLS"
+
+          UNSIGNED_APK=$(find "$APK_DIR" -type f -name "*.apk" \
+            -not -name "*-signed.apk" -not -name "aligned.apk" \
+            \( -name "*unsigned.apk" -o -name "*-release.apk" -o -name "*-release-unsigned.apk" \) \
+            | head -n 1)
+
+          if [ -z "$UNSIGNED_APK" ]; then
+            UNSIGNED_APK=$(find "$APK_DIR" -type f -name "*.apk" \
+              -not -name "*-signed.apk" -not -name "aligned.apk" | head -n 1)
+          fi
+
+          if [ -z "$UNSIGNED_APK" ]; then
+            echo "ERROR: Tiada APK ditemui dalam $APK_DIR."
+            ls -la "$APK_DIR"
+            exit 1
+          fi
+
+          echo "APK yang akan di-sign: $UNSIGNED_APK"
+
+          "$BUILD_TOOLS/zipalign" -v -p 4 "$UNSIGNED_APK" "$APK_DIR/aligned.apk"
+
+          FINAL_APK_NAME="OmniKitMY-v${APP_VERSION}-signed.apk"
+
+          "$BUILD_TOOLS/apksigner" sign --ks release.keystore \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass pass:"$STORE_PASSWORD" \
+            --key-pass pass:"$KEY_PASSWORD" \
+            --out "$APK_DIR/$FINAL_APK_NAME" \
+            "$APK_DIR/aligned.apk"
+
+          "$BUILD_TOOLS/apksigner" verify --verbose "$APK_DIR/$FINAL_APK_NAME"
+
+          APK_SIZE=$(stat -c%s "$APK_DIR/$FINAL_APK_NAME")
+          echo "SIGNED_APK_PATH=$APK_DIR/$FINAL_APK_NAME" >> "$GITHUB_ENV"
+          echo "SIGNED_APK_SIZE=$APK_SIZE" >> "$GITHUB_ENV"
+          rm -f release.keystore "$APK_DIR/aligned.apk"
+
+      - name: 9. Cipta GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ env.APP_VERSION }}"
+          name: "OmniKitMY Release v${{ env.APP_VERSION }}"
+          body_path: release_notes.md
+          files: ${{ env.SIGNED_APK_PATH }}
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 10. Kemaskini version.json di GitHub
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          python3 - << 'EOF'
+          import json, os
+          from datetime import datetime, timezone
+
+          app_ver = os.environ["APP_VERSION"]
+          ver_code = int(os.environ["VERSION_CODE"])
+          apk_size = int(os.environ.get("SIGNED_APK_SIZE", "-1"))
+          repo = os.environ["GITHUB_REPOSITORY"]
+          today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+          apk_url = f"https://github.com/{repo}/releases/download/v{app_ver}/OmniKitMY-v{app_ver}-signed.apk"
+
+          if os.path.exists("clean_notes.txt"):
+              with open("clean_notes.txt", "r", encoding="utf-8") as f:
+                  clean_notes = f.read().strip()
+          else:
+              clean_notes = f"Kemaskini baharu OmniKitMY v{app_ver}"
+
+          payload = {
+              "versionCode": ver_code,
+              "versionName": app_ver,
+              "latestVersion": app_ver,
+              "apkUrl": apk_url,
+              "downloadUrl": apk_url,
+              "size": apk_size,
+              "releaseNotes": clean_notes,
+              "updatedAt": today
+          }
+          with open("version.json", "w", encoding="utf-8") as f:
+              json.dump(payload, f, indent=2, ensure_ascii=False)
+              f.write("\n")
+          EOF
+
+          TARGET_BRANCH="${GITHUB_REF_NAME:-main}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add version.json
+
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: kemaskini version.json ke v${APP_VERSION} (build ${VERSION_CODE}) [skip ci]"
+            if ! git push origin "HEAD:${TARGET_BRANCH}"; then
+              echo "Amaran: git push ditolak (commit_refs_rules), cuba kemaskini melalui GitHub API..."
+              sleep 3
+              FILE_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/contents/version.json?ref=${TARGET_BRANCH}" --jq '.sha' 2>/dev/null || echo "")
+              CONTENT_B64=$(base64 -w 0 version.json)
+              if [ -n "$FILE_SHA" ]; then
+                gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/version.json" \
+                  -f message="chore: kemaskini version.json ke v${APP_VERSION} (build ${VERSION_CODE}) [skip ci]" \
+                  -f content="$CONTENT_B64" \
+                  -f sha="$FILE_SHA" \
+                  -f branch="$TARGET_BRANCH" >/dev/null || echo "Amaran: Kemaskini version.json melalui API juga disekat."
+              else
+                gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/version.json" \
+                  -f message="chore: kemaskini version.json ke v${APP_VERSION} (build ${VERSION_CODE}) [skip ci]" \
+                  -f content="$CONTENT_B64" \
+                  -f branch="$TARGET_BRANCH" >/dev/null || echo "Amaran: Kemaskini version.json melalui API juga disekat."
+              fi
+            fi
+          else
+            echo "version.json tidak berubah, langkau commit."
+          fi
+
+      - name: 11. Simpan ke Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniKitMY-v${{ env.APP_VERSION }}-APK
+          path: ${{ env.SIGNED_APK_PATH }}
+          retention-days: 14
