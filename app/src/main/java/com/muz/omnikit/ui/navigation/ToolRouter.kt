@@ -1,20 +1,6 @@
 package com.muz.omnikit.ui.navigation
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -24,7 +10,6 @@ import com.muz.omnikit.core.model.AppSettings
 import com.muz.omnikit.core.model.Language
 import com.muz.omnikit.core.model.ThemeMode
 import com.muz.omnikit.core.model.ToolId
-import com.muz.omnikit.core.registry.ToolRegistry
 import com.muz.omnikit.core.updater.UpdateUiState
 import com.muz.omnikit.tools.audio.FlashlightScreen
 import com.muz.omnikit.tools.audio.SoundMeterScreen
@@ -39,11 +24,17 @@ import com.muz.omnikit.tools.measure.VibrometerScreen
 import com.muz.omnikit.tools.media.DocumentPdfScreen
 import com.muz.omnikit.tools.media.ExifScannerScreen
 import com.muz.omnikit.tools.media.ImageCompressorScreen
+import com.muz.omnikit.tools.network.GpsSpeedScreen
+import com.muz.omnikit.tools.network.NfcToolScreen
+import com.muz.omnikit.tools.network.SignalMeterScreen
 import com.muz.omnikit.tools.sensors.CompassScreen
 import com.muz.omnikit.tools.sensors.LevelerScreen
 import com.muz.omnikit.tools.sensors.LightMeterScreen
 import com.muz.omnikit.tools.sensors.MetalDetectorScreen
-import com.muz.omnikit.ui.components.ToolScaffold
+import com.muz.omnikit.tools.utility.DateCalculatorScreen
+import com.muz.omnikit.tools.utility.DeviceTesterScreen
+import com.muz.omnikit.tools.utility.TallyStopwatchScreen
+import com.muz.omnikit.tools.utility.UnitConverterScreen
 import com.muz.omnikit.ui.home.HomeScreen
 import com.muz.omnikit.ui.settings.SettingsScreen
 
@@ -153,48 +144,15 @@ private fun ToolScreenDispatcher(
         ToolId.EXIF_SCANNER -> ExifScannerScreen(lang = lang, onBack = onBack)
         ToolId.IMAGE_COMPRESSOR -> ImageCompressorScreen(lang = lang, onBack = onBack)
 
-        // === PHASES 7-8: PENDING DELTA PACKAGES ===
-        else -> {
-            val def = ToolRegistry.findById(toolId)
-            ToolScaffold(
-                title = def.name(lang),
-                subtitle = def.desc(lang),
-                onBack = onBack
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = def.icon,
-                        contentDescription = null,
-                        tint = Color(def.accentHex),
-                        modifier = Modifier.size(56.dp)
-                    )
-                    Text(
-                        text = lang.tr(
-                            "Modul Fasa ${def.buildPhase} Belum Dipasang",
-                            "Phase ${def.buildPhase} Module Pending"
-                        ),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 16.dp)
-                    )
-                    Text(
-                        text = lang.tr(
-                            "Tambah fail ZIP Fasa ${def.buildPhase} ke projek untuk mengaktifkan alatan native penuh ini.",
-                            "Merge Phase ${def.buildPhase} ZIP into the repository to activate this full native tool."
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-            }
-        }
+        // === PHASE 7: GPS, SIGNAL & NFC ===
+        ToolId.GPS_SPEED -> GpsSpeedScreen(lang = lang, onBack = onBack)
+        ToolId.SIGNAL_METER -> SignalMeterScreen(lang = lang, onBack = onBack)
+        ToolId.NFC_TOOL -> NfcToolScreen(lang = lang, onBack = onBack)
+
+        // === PHASE 8: UTILITIES, COUNTER & DEVICE TESTER ===
+        ToolId.UNIT_CONVERTER -> UnitConverterScreen(lang = lang, onBack = onBack)
+        ToolId.DATE_CALC -> DateCalculatorScreen(lang = lang, onBack = onBack)
+        ToolId.TALLY_STOPWATCH -> TallyStopwatchScreen(lang = lang, onBack = onBack)
+        ToolId.DEVICE_TESTER -> DeviceTesterScreen(lang = lang, onBack = onBack)
     }
 }
