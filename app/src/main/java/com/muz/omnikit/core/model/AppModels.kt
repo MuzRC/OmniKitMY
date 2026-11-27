@@ -74,7 +74,10 @@ enum class ToolId(val routeKey: String) {
     UNIT_CONVERTER("unit_converter"),
     DATE_CALC("date_calc"),
     TALLY_STOPWATCH("tally_stopwatch"),
-    DEVICE_TESTER("device_tester");
+    DEVICE_TESTER("device_tester"),
+
+    // Phase 9: Acoustic Data Transfer & Offline APK/File Drop
+    SUARA_DROP("suara_drop");
 
     companion object {
         fun fromRouteKey(key: String?): ToolId? =
