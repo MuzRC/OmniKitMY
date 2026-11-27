@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Outer Omni Hexagonal Precision Shield (within safe 66dp zone) -->
+    <path
+        android:pathData="M54,21 L81,36.5 L81,71.5 L54,87 L27,71.5 L27,36.5 Z"
+        android:strokeWidth="2.8"
+        android:strokeLineJoin="round"
+        android:fillColor="#10213E">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:type="linear"
+                android:startX="27"
+                android:startY="21"
+                android:endX="81"
+                android:endY="87"
+                android:startColor="#38BDF8"
+                android:centerColor="#3B82F6"
+                android:endColor="#FBBF24" />
+        </aapt:attr>
+    </path>
+
+    <!-- Inner Instrument Dial Ring -->
+    <path
+        android:pathData="M54,30 A24,24 0 1,1 53.99,30 Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#4838BDF8"
+        android:fillColor="#0A152B" />
+
+    <!-- Cardinal Sensor Ticks -->
+    <path
+        android:pathData="M54,26.5 L54,31.5 M54,76.5 L54,81.5 M26.5,54 L31.5,54 M76.5,54 L81.5,54"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="round"
+        android:strokeColor="#38BDF8" />
+
+    <!-- Toolbox Top Handle -->
+    <path
+        android:pathData="M46.5,42 L46.5,38.2 C46.5,36.6 47.8,35.5 49.4,35.5 L58.6,35.5 C60.2,35.5 61.5,36.6 61.5,38.2 L61.5,42"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:strokeColor="#38BDF8"
+        android:fillColor="#00000000" />
+
+    <!-- Central Utility Kit Case -->
+    <path
+        android:pathData="M37,46 C37,43.2 39.2,41 42,41 L66,41 C68.8,41 71,43.2 71,46 L71,65 C71,67.8 68.8,70 66,70 L42,70 C39.2,70 37,67.8 37,65 Z"
+        android:strokeWidth="2.2"
+        android:strokeColor="#E2E8F0"
+        android:fillColor="#18335E" />
+
+    <!-- Toolbox Clasp Divider -->
+    <path
+        android:pathData="M37.5,52.5 L70.5,52.5"
+        android:strokeWidth="1.6"
+        android:strokeColor="#6638BDF8" />
+
+    <!-- Precision Compass Diamond Core -->
+    <path
+        android:pathData="M54,44.5 L60.5,55.5 L54,53.2 L47.5,55.5 Z"
+        android:fillColor="#FBBF24" />
+    <path
+        android:pathData="M54,66.5 L60.5,55.5 L54,57.8 L47.5,55.5 Z"
+        android:fillColor="#38BDF8" />
+    <path
+        android:pathData="M54,53.5 A2,2 0 1,1 53.99,53.5 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Subtle MY Gold North Star Spark -->
+    <path
+        android:pathData="M54,17.2 L55.3,20.2 L58.4,21.5 L55.3,22.8 L54,25.8 L52.7,22.8 L49.6,21.5 L52.7,20.2 Z"
+        android:fillColor="#FBBF24" />
+</vector>
