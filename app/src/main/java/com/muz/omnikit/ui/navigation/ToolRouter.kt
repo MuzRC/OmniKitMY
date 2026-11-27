@@ -13,6 +13,7 @@ import com.muz.omnikit.core.model.ToolId
 import com.muz.omnikit.core.updater.UpdateUiState
 import com.muz.omnikit.tools.audio.FlashlightScreen
 import com.muz.omnikit.tools.audio.SoundMeterScreen
+import com.muz.omnikit.tools.audio.SoundTransferScreen
 import com.muz.omnikit.tools.audio.SpeakerAudioScreen
 import com.muz.omnikit.tools.camera.MagnifierColorScreen
 import com.muz.omnikit.tools.camera.OcrScannerScreen
@@ -154,5 +155,8 @@ private fun ToolScreenDispatcher(
         ToolId.DATE_CALC -> DateCalculatorScreen(lang = lang, onBack = onBack)
         ToolId.TALLY_STOPWATCH -> TallyStopwatchScreen(lang = lang, onBack = onBack)
         ToolId.DEVICE_TESTER -> DeviceTesterScreen(lang = lang, onBack = onBack)
+
+        // === PHASE 9: SUARADROP PRO (ACOUSTIC + OFFLINE LAN DROP) ===
+        ToolId.SUARA_DROP -> SoundTransferScreen(lang = lang, onBack = onBack)
     }
 }
