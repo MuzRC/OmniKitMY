@@ -26,6 +26,9 @@ import com.muz.omnikit.core.model.ThemeMode
 import com.muz.omnikit.core.model.ToolId
 import com.muz.omnikit.core.registry.ToolRegistry
 import com.muz.omnikit.core.updater.UpdateUiState
+import com.muz.omnikit.tools.measure.ProtractorScreen
+import com.muz.omnikit.tools.measure.RulerScreen
+import com.muz.omnikit.tools.measure.VibrometerScreen
 import com.muz.omnikit.tools.sensors.CompassScreen
 import com.muz.omnikit.tools.sensors.LevelerScreen
 import com.muz.omnikit.tools.sensors.LightMeterScreen
@@ -119,7 +122,12 @@ private fun ToolScreenDispatcher(
         ToolId.METAL_DETECTOR -> MetalDetectorScreen(lang = lang, onBack = onBack)
         ToolId.LIGHT_METER -> LightMeterScreen(lang = lang, onBack = onBack)
 
-        // === PHASES 3-8: PENDING DELTA PACKAGES ===
+        // === PHASE 3: PHYSICAL MEASURE & VIBRATION ===
+        ToolId.RULER -> RulerScreen(lang = lang, onBack = onBack)
+        ToolId.PROTRACTOR -> ProtractorScreen(lang = lang, onBack = onBack)
+        ToolId.VIBROMETER -> VibrometerScreen(lang = lang, onBack = onBack)
+
+        // === PHASES 4-8: PENDING DELTA PACKAGES ===
         else -> {
             val def = ToolRegistry.findById(toolId)
             ToolScaffold(
