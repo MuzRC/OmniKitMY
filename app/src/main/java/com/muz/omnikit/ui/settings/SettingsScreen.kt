@@ -106,7 +106,6 @@ fun SettingsScreen(
     val notifPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {
-        // Proceed with foreground service download regardless so update still runs reliably
         pendingDownloadInfo?.let { info ->
             UpdateDownloadService.startDownload(context, info)
             pendingDownloadInfo = null
@@ -124,7 +123,6 @@ fun SettingsScreen(
         }
     }
 
-    // Smoothly scroll to targeted section when entered via 3-dot shortcut
     LaunchedEffect(initialSection) {
         when (initialSection) {
             "theme" -> listState.animateScrollToItem(0)
@@ -289,6 +287,13 @@ fun SettingsScreen(
                         UpdateStatus.AVAILABLE -> {
                             val info = updateState.updateInfo
                             if (info != null) {
+                                val metaParts = buildList {
+                                    if (info.updatedAt.isNotBlank()) add(info.updatedAt)
+                                    if (info.fileSizeBytes > 0L) {
+                                        add(String.format(Locale.US, "%.1f MB", info.fileSizeBytes / 1_048_576.0))
+                                    }
+                                }.joinToString(" • ")
+
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -306,11 +311,19 @@ fun SettingsScreen(
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
                                         )
+                                        if (metaParts.isNotBlank()) {
+                                            Text(
+                                                text = metaParts,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                         if (info.releaseNotes.isNotBlank()) {
+                                            Spacer(modifier = Modifier.height(2.dp))
                                             Text(
                                                 text = info.releaseNotes,
                                                 style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                color = MaterialTheme.colorScheme.onSurface
                                             )
                                         }
                                     }
