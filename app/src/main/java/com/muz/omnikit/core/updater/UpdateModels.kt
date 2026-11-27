@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 object UpdateConfig {
-    // Primary manifest updated by your GitHub Actions YAML workflow
+    // Primary manifest auto-updated by Step 10 of .github/workflows/build-apk.yml
     const val VERSION_JSON_URL = "https://raw.githubusercontent.com/MuzRC/OmniKitMY/main/version.json"
 
     // Automatic fallback to latest GitHub Release if version.json is unavailable
@@ -17,7 +17,8 @@ data class UpdateInfo(
     val versionName: String,
     val apkUrl: String,
     val releaseNotes: String,
-    val fileSizeBytes: Long = -1L
+    val fileSizeBytes: Long = -1L,
+    val updatedAt: String = ""
 )
 
 enum class UpdateStatus {
