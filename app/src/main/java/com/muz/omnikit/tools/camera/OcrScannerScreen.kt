@@ -143,7 +143,7 @@ fun OcrScannerScreen(
     }
 
     val wordCount = remember(extractedText) {
-        extractedText.trim().split(Regex("\s+")).count { it.isNotBlank() }
+        extractedText.trim().split(Regex("\\s+")).count { it.isNotBlank() }
     }
 
     ToolScaffold(

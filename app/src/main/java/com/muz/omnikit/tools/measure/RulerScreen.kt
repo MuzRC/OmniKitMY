@@ -345,7 +345,7 @@ fun RulerScreen(
                                 val inchVal = sixteenth / 16
                                 drawIntoCanvas { canvas ->
                                     canvas.nativeCanvas.drawText(
-                                        "$inchVal"",
+                                        "$inchVal\"",
                                         w - tickLen - 6.dp.toPx(),
                                         y + labelPaint.textSize * 0.35f,
                                         labelPaint

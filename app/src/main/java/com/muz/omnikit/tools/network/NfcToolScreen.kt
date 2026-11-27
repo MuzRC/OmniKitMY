@@ -667,8 +667,7 @@ private fun decodeNdefRecord(record: NdefRecord): DecodedNdefRecord {
     }
     val typeStr = String(record.type, StandardCharsets.UTF_8).ifBlank { "Raw" }
     val textAttempt = String(payload, StandardCharsets.UTF_8)
-    val printable = textAttempt.all { it.code in 32..126 || it == '
-' || it == '' || it == '	' }
+    val printable = textAttempt.all { it.code in 32..126 || it == '\n' || it == '\r' || it == '\t' }
     val display = if (printable && textAttempt.isNotBlank()) {
         textAttempt
     } else {
