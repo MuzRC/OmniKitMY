@@ -16,6 +16,7 @@ import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.NetworkCheck
 import androidx.compose.material.icons.rounded.Nfc
 import androidx.compose.material.icons.rounded.PictureAsPdf
+import androidx.compose.material.icons.rounded.Podcasts
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.Radar
 import androidx.compose.material.icons.rounded.Speed
@@ -23,7 +24,7 @@ import androidx.compose.material.icons.rounded.SquareFoot
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Vibration
-import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.ZoomIn
 import com.muz.omnikit.core.model.ToolCategory
 import com.muz.omnikit.core.model.ToolDefinition
@@ -125,7 +126,7 @@ object ToolRegistry {
         ToolDefinition(
             id = ToolId.SPEAKER_AUDIO,
             category = ToolCategory.AUDIO_LIGHT,
-            icon = Icons.Rounded.VolumeUp,
+            icon = Icons.AutoMirrored.Rounded.VolumeUp,
             accentHex = 0xFF3B82F6,
             nameMs = "Audio & Pencuci Speaker",
             nameEn = "Tone & Speaker Cleaner",
@@ -143,6 +144,17 @@ object ToolRegistry {
             descMs = "Kecerahan, strob, SOS & kod Morse",
             descEn = "Brightness, strobe, SOS & Morse",
             buildPhase = 4
+        ),
+        ToolDefinition(
+            id = ToolId.SUARA_DROP,
+            category = ToolCategory.AUDIO_LIGHT,
+            icon = Icons.Rounded.Podcasts,
+            accentHex = 0xFF06B6D4,
+            nameMs = "SuaraDrop Pro",
+            nameEn = "SuaraDrop Pro",
+            descMs = "Hantar teks guna bunyi & kongsi APK/fail luar talian",
+            descEn = "Send text over sound & share APK/files offline",
+            buildPhase = 9
         ),
 
         // === CAMERA & SCAN ===
