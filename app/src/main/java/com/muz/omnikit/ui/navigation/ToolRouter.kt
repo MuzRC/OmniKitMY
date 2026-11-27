@@ -26,6 +26,12 @@ import com.muz.omnikit.core.model.ThemeMode
 import com.muz.omnikit.core.model.ToolId
 import com.muz.omnikit.core.registry.ToolRegistry
 import com.muz.omnikit.core.updater.UpdateUiState
+import com.muz.omnikit.tools.audio.FlashlightScreen
+import com.muz.omnikit.tools.audio.SoundMeterScreen
+import com.muz.omnikit.tools.audio.SpeakerAudioScreen
+import com.muz.omnikit.tools.camera.MagnifierColorScreen
+import com.muz.omnikit.tools.camera.OcrScannerScreen
+import com.muz.omnikit.tools.camera.QRScannerScreen
 import com.muz.omnikit.tools.measure.ProtractorScreen
 import com.muz.omnikit.tools.measure.RulerScreen
 import com.muz.omnikit.tools.measure.VibrometerScreen
@@ -127,7 +133,17 @@ private fun ToolScreenDispatcher(
         ToolId.PROTRACTOR -> ProtractorScreen(lang = lang, onBack = onBack)
         ToolId.VIBROMETER -> VibrometerScreen(lang = lang, onBack = onBack)
 
-        // === PHASES 4-8: PENDING DELTA PACKAGES ===
+        // === PHASE 4: AUDIO & FLASHLIGHT ===
+        ToolId.SOUND_METER -> SoundMeterScreen(lang = lang, onBack = onBack)
+        ToolId.SPEAKER_AUDIO -> SpeakerAudioScreen(lang = lang, onBack = onBack)
+        ToolId.FLASHLIGHT -> FlashlightScreen(lang = lang, onBack = onBack)
+
+        // === PHASE 5: SMART CAMERA & SCANNERS ===
+        ToolId.QR_SCANNER -> QRScannerScreen(lang = lang, onBack = onBack)
+        ToolId.OCR_SCANNER -> OcrScannerScreen(lang = lang, onBack = onBack)
+        ToolId.MAGNIFIER_COLOR -> MagnifierColorScreen(lang = lang, onBack = onBack)
+
+        // === PHASES 6-8: PENDING DELTA PACKAGES ===
         else -> {
             val def = ToolRegistry.findById(toolId)
             ToolScaffold(
