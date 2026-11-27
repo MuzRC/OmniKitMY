@@ -26,15 +26,14 @@ import com.muz.omnikit.core.model.ThemeMode
 import com.muz.omnikit.core.model.ToolId
 import com.muz.omnikit.core.registry.ToolRegistry
 import com.muz.omnikit.core.updater.UpdateUiState
+import com.muz.omnikit.tools.sensors.CompassScreen
+import com.muz.omnikit.tools.sensors.LevelerScreen
+import com.muz.omnikit.tools.sensors.LightMeterScreen
+import com.muz.omnikit.tools.sensors.MetalDetectorScreen
 import com.muz.omnikit.ui.components.ToolScaffold
 import com.muz.omnikit.ui.home.HomeScreen
 import com.muz.omnikit.ui.settings.SettingsScreen
 
-/**
- * Central Navigation Router.
- * In Phases 2 through 8, only this router file is updated to bind each newly
- * added real native tool screen to its ToolId.
- */
 @Composable
 fun OmniKitNavHost(
     settings: AppSettings,
@@ -113,45 +112,55 @@ private fun ToolScreenDispatcher(
     lang: Language,
     onBack: () -> Unit
 ) {
-    // Phases 2-8 bind real native tool screens here
-    val def = ToolRegistry.findById(toolId)
-    ToolScaffold(
-        title = def.name(lang),
-        subtitle = def.desc(lang),
-        onBack = onBack
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = def.icon,
-                contentDescription = null,
-                tint = Color(def.accentHex),
-                modifier = Modifier.size(56.dp)
-            )
-            Text(
-                text = lang.tr(
-                    "Modul Fasa ${def.buildPhase} Belum Dipasang",
-                    "Phase ${def.buildPhase} Module Pending"
-                ),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 16.dp)
-            )
-            Text(
-                text = lang.tr(
-                    "Tambah fail ZIP Fasa ${def.buildPhase} ke projek untuk mengaktifkan alatan native penuh ini.",
-                    "Merge Phase ${def.buildPhase} ZIP into the repository to activate this full native tool."
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp)
-            )
+    when (toolId) {
+        // === PHASE 2: SENSORS & ENVIRONMENT ===
+        ToolId.COMPASS -> CompassScreen(lang = lang, onBack = onBack)
+        ToolId.LEVELER -> LevelerScreen(lang = lang, onBack = onBack)
+        ToolId.METAL_DETECTOR -> MetalDetectorScreen(lang = lang, onBack = onBack)
+        ToolId.LIGHT_METER -> LightMeterScreen(lang = lang, onBack = onBack)
+
+        // === PHASES 3-8: PENDING DELTA PACKAGES ===
+        else -> {
+            val def = ToolRegistry.findById(toolId)
+            ToolScaffold(
+                title = def.name(lang),
+                subtitle = def.desc(lang),
+                onBack = onBack
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = def.icon,
+                        contentDescription = null,
+                        tint = Color(def.accentHex),
+                        modifier = Modifier.size(56.dp)
+                    )
+                    Text(
+                        text = lang.tr(
+                            "Modul Fasa ${def.buildPhase} Belum Dipasang",
+                            "Phase ${def.buildPhase} Module Pending"
+                        ),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                    Text(
+                        text = lang.tr(
+                            "Tambah fail ZIP Fasa ${def.buildPhase} ke projek untuk mengaktifkan alatan native penuh ini.",
+                            "Merge Phase ${def.buildPhase} ZIP into the repository to activate this full native tool."
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
         }
     }
 }
