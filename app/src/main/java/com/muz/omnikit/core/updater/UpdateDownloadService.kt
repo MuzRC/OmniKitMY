@@ -66,35 +66,36 @@ class UpdateDownloadService : Service() {
             ACTION_START -> {
                 val apkUrl = intent.getStringExtra(EXTRA_APK_URL).orEmpty()
                 val versionName = intent.getStringExtra(EXTRA_VERSION_NAME).orEmpty()
+                val expectedSize = intent.getLongExtra(EXTRA_FILE_SIZE, -1L)
                 if (apkUrl.isBlank()) {
                     stopSelf()
                     return START_NOT_STICKY
                 }
 
-                startInForeground(buildProgressNotification(versionName, 0, 0L, -1L))
+                startInForeground(buildProgressNotification(versionName, 0, 0L, expectedSize))
                 acquireLocks()
 
                 downloadJob?.cancel()
                 downloadJob = serviceScope.launch {
-                    runDownload(apkUrl, versionName)
+                    runDownload(apkUrl, versionName, expectedSize)
                 }
             }
         }
         return START_NOT_STICKY
     }
 
-    private suspend fun runDownload(apkUrl: String, versionName: String) {
+    private suspend fun runDownload(apkUrl: String, versionName: String, expectedSize: Long) {
         val downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: cacheDir
         downloadsDir.mkdirs()
         val tempFile = File(downloadsDir, "OmniKitMY_update.apk.part")
-        val finalFile = File(downloadsDir, "OmniKitMY_v${versionName.ifBlank { "latest" }}.apk")
+        val finalFile = File(downloadsDir, "OmniKitMY-v${versionName.ifBlank { "latest" }}-signed.apk")
 
         try {
             UpdateStateHolder.update {
                 it.copy(
                     status = UpdateStatus.DOWNLOADING,
                     downloadedBytes = 0L,
-                    totalBytes = -1L,
+                    totalBytes = expectedSize,
                     progressPercent = 0,
                     errorMessage = null
                 )
@@ -102,7 +103,8 @@ class UpdateDownloadService : Service() {
 
             val conn = openConnectionFollowingRedirects(apkUrl)
             try {
-                val totalBytes = conn.contentLengthLong
+                val headerLength = conn.contentLengthLong
+                val totalBytes = if (headerLength > 0L) headerLength else expectedSize
                 var downloaded = 0L
                 var lastNotifyMs = 0L
                 val buffer = ByteArray(16 * 1024)
@@ -155,12 +157,14 @@ class UpdateDownloadService : Service() {
                 it.copy(
                     status = UpdateStatus.COMPLETED,
                     progressPercent = 100,
+                    downloadedBytes = finalFile.length(),
+                    totalBytes = finalFile.length(),
                     downloadedApkPath = finalFile.absolutePath,
                     errorMessage = null
                 )
             }
 
-            // Notify active UI & post high-priority tap-to-install notification for screen-off users
+            // Paparkan dialog pasang automatik di skrin app & notifikasi berkeutamaan tinggi bila skrin padam
             HardwareEventBus.setPendingInstallApk(finalFile.absolutePath)
             stopForeground(STOP_FOREGROUND_REMOVE)
             updateNotification(
@@ -193,6 +197,7 @@ class UpdateDownloadService : Service() {
                 connectTimeout = 20_000
                 readTimeout = 30_000
                 instanceFollowRedirects = false
+                useCaches = false
                 setRequestProperty("User-Agent", "OmniKitMY-Updater")
             }
             val code = conn.responseCode
@@ -238,7 +243,7 @@ class UpdateDownloadService : Service() {
             }
             wifiLock = wm?.createWifiLock(wifiMode, "OmniKitMY::UpdateWifiLock")?.apply { acquire() }
         } catch (_: Exception) {
-            // Proceed even if device restricts lock
+            // Teruskan walaupun peranti menyekat lock
         }
     }
 
@@ -364,12 +369,14 @@ class UpdateDownloadService : Service() {
         const val ACTION_CANCEL = "com.muz.omnikit.action.CANCEL_UPDATE_DOWNLOAD"
         const val EXTRA_APK_URL = "extra_apk_url"
         const val EXTRA_VERSION_NAME = "extra_version_name"
+        const val EXTRA_FILE_SIZE = "extra_file_size"
 
         fun startDownload(context: Context, info: UpdateInfo) {
             val intent = Intent(context, UpdateDownloadService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_APK_URL, info.apkUrl)
                 putExtra(EXTRA_VERSION_NAME, info.versionName)
+                putExtra(EXTRA_FILE_SIZE, info.fileSizeBytes)
             }
             ContextCompat.startForegroundService(context, intent)
         }
