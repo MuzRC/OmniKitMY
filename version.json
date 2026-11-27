@@ -1,0 +1,10 @@
+{
+  "versionCode": 77,
+  "versionName": "1.0.77",
+  "latestVersion": "1.0.77",
+  "apkUrl": "https://github.com/MuzRC/OmniKitMY/releases/download/v1.0.77/OmniKitMY-v1.0.77-signed.apk",
+  "downloadUrl": "https://github.com/MuzRC/OmniKitMY/releases/download/v1.0.77/OmniKitMY-v1.0.77-signed.apk",
+  "size": 68238337,
+  "releaseNotes": "- Add files via upload\n- Refactor SettingsScreen by cleaning up comments and styles\n- Add expected size parameter to download methods\n- Update fetch logic and add updatedAt field\n- Modify UpdateConfig comments and add updatedAt field\n- Create build-apk.yml for OmniKitMY release process\n- Add files via upload\n- Add files via upload\n- Add files via upload\n- Add files via upload",
+  "updatedAt": "2026-11-27"
+}
