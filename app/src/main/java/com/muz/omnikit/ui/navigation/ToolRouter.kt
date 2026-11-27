@@ -32,9 +32,13 @@ import com.muz.omnikit.tools.audio.SpeakerAudioScreen
 import com.muz.omnikit.tools.camera.MagnifierColorScreen
 import com.muz.omnikit.tools.camera.OcrScannerScreen
 import com.muz.omnikit.tools.camera.QRScannerScreen
+import com.muz.omnikit.tools.camera.RangefinderScreen
 import com.muz.omnikit.tools.measure.ProtractorScreen
 import com.muz.omnikit.tools.measure.RulerScreen
 import com.muz.omnikit.tools.measure.VibrometerScreen
+import com.muz.omnikit.tools.media.DocumentPdfScreen
+import com.muz.omnikit.tools.media.ExifScannerScreen
+import com.muz.omnikit.tools.media.ImageCompressorScreen
 import com.muz.omnikit.tools.sensors.CompassScreen
 import com.muz.omnikit.tools.sensors.LevelerScreen
 import com.muz.omnikit.tools.sensors.LightMeterScreen
@@ -143,7 +147,13 @@ private fun ToolScreenDispatcher(
         ToolId.OCR_SCANNER -> OcrScannerScreen(lang = lang, onBack = onBack)
         ToolId.MAGNIFIER_COLOR -> MagnifierColorScreen(lang = lang, onBack = onBack)
 
-        // === PHASES 6-8: PENDING DELTA PACKAGES ===
+        // === PHASE 6: DOCUMENT, PDF, RANGEFINDER & IMAGE ===
+        ToolId.DOC_PDF -> DocumentPdfScreen(lang = lang, onBack = onBack)
+        ToolId.RANGEFINDER -> RangefinderScreen(lang = lang, onBack = onBack)
+        ToolId.EXIF_SCANNER -> ExifScannerScreen(lang = lang, onBack = onBack)
+        ToolId.IMAGE_COMPRESSOR -> ImageCompressorScreen(lang = lang, onBack = onBack)
+
+        // === PHASES 7-8: PENDING DELTA PACKAGES ===
         else -> {
             val def = ToolRegistry.findById(toolId)
             ToolScaffold(
