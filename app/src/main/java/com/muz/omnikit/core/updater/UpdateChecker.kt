@@ -32,17 +32,19 @@ object UpdateChecker {
     }
 
     private fun fetchFromVersionJson(): UpdateInfo? {
-        val raw = httpGetString(UpdateConfig.VERSION_JSON_URL) ?: return null
+        val freshUrl = "${UpdateConfig.VERSION_JSON_URL}?t=${System.currentTimeMillis()}"
+        val raw = httpGetString(freshUrl) ?: return null
         val json = JSONObject(raw)
 
         val apkUrl = json.optString("apkUrl")
-            .ifBlank { json.optString("apk_url") }
             .ifBlank { json.optString("downloadUrl") }
+            .ifBlank { json.optString("apk_url") }
             .ifBlank { json.optString("download_url") }
             .ifBlank { json.optString("url") }
         if (apkUrl.isBlank()) return null
 
         val versionName = json.optString("versionName")
+            .ifBlank { json.optString("latestVersion") }
             .ifBlank { json.optString("version_name") }
             .ifBlank { json.optString("version") }
             .removePrefix("v")
@@ -61,13 +63,16 @@ object UpdateChecker {
             .ifBlank { json.optString("notes") }
 
         val size = json.optLong("size", json.optLong("fileSize", -1L))
+        val updatedAt = json.optString("updatedAt")
+            .ifBlank { json.optString("updated_at") }
 
         return UpdateInfo(
             versionCode = versionCode,
             versionName = versionName,
             apkUrl = apkUrl,
             releaseNotes = notes,
-            fileSizeBytes = size
+            fileSizeBytes = size,
+            updatedAt = updatedAt
         )
     }
 
@@ -76,6 +81,7 @@ object UpdateChecker {
         val json = JSONObject(raw)
         val tagName = json.optString("tag_name").removePrefix("v").removePrefix("V")
         val body = json.optString("body")
+        val publishedAt = json.optString("published_at").take(10)
         val assets = json.optJSONArray("assets") ?: return null
 
         var apkUrl = ""
@@ -96,7 +102,8 @@ object UpdateChecker {
             versionName = tagName.ifBlank { "1.0.0" },
             apkUrl = apkUrl,
             releaseNotes = body,
-            fileSizeBytes = apkSize
+            fileSizeBytes = apkSize,
+            updatedAt = publishedAt
         )
     }
 
@@ -105,8 +112,11 @@ object UpdateChecker {
             requestMethod = "GET"
             connectTimeout = 15_000
             readTimeout = 15_000
+            useCaches = false
             instanceFollowRedirects = true
             setRequestProperty("Accept", "application/json")
+            setRequestProperty("Cache-Control", "no-cache")
+            setRequestProperty("Pragma", "no-cache")
             setRequestProperty("User-Agent", "OmniKitMY-Android/${BuildConfig.VERSION_NAME}")
         }
         return try {
@@ -123,7 +133,10 @@ object UpdateChecker {
         localCode: Int,
         localName: String
     ): Boolean {
-        if (remoteCode > 0 && remoteCode > localCode) return true
+        // Authoritative check using commit-based versionCode from build-apk.yml
+        if (remoteCode > 0 && localCode > 0) {
+            return remoteCode > localCode
+        }
         val rParts = remoteName.split(".", "-", "_").mapNotNull { it.toIntOrNull() }
         val lParts = localName.split(".", "-", "_").mapNotNull { it.toIntOrNull() }
         val maxLen = maxOf(rParts.size, lParts.size)
