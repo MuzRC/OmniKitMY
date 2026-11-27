@@ -1,9 +1,0 @@
-{
-  "appId": "com.muz.omnikit",
-  "appName": "OmniKit",
-  "webDir": "dist",
-  "bundledWebRuntime": false,
-  "server": {
-    "androidScheme": "https"
-  }
-}
