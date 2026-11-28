@@ -1,10 +1,10 @@
 {
-  "versionCode": 83,
-  "versionName": "1.0.83",
-  "latestVersion": "1.0.83",
-  "apkUrl": "https://github.com/MuzRC/OmniKitMY/releases/download/v1.0.83/OmniKitMY-v1.0.83-signed.apk",
-  "downloadUrl": "https://github.com/MuzRC/OmniKitMY/releases/download/v1.0.83/OmniKitMY-v1.0.83-signed.apk",
+  "versionCode": 87,
+  "versionName": "1.0.87",
+  "latestVersion": "1.0.87",
+  "apkUrl": "https://github.com/MuzRC/OmniKitMY/releases/download/v1.0.87/OmniKitMY-v1.0.87-signed.apk",
+  "downloadUrl": "https://github.com/MuzRC/OmniKitMY/releases/download/v1.0.87/OmniKitMY-v1.0.87-signed.apk",
   "size": 68271105,
-  "releaseNotes": "- Add files via upload\n- Add files via upload\n- Add files via upload\n- Add files via upload\n- chore: kemaskini version.json ke v1.0.78 (build 78) [skip ci]",
-  "updatedAt": "2026-11-27"
+  "releaseNotes": "- Delete app/src/main/java/com/muz/sdprobe/core directory\n- Delete rust_core/src directory\n- Add files via upload\n- chore: kemaskini version.json ke v1.0.83 (build 83) [skip ci]",
+  "updatedAt": "2026-11-28"
 }
